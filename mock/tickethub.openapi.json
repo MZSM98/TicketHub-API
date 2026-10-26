@@ -4752,7 +4752,7 @@
         ],
         "operationId": "deleteEvent",
         "summary": "Delete my DRAFT event (CU-12)",
-        "description": "**Role:** ORGANIZER (owner). Only DRAFT events can be deleted. A PUBLISHED event is\ncancelled instead with `PATCH /events/{eventId}/status`.\n",
+        "description": "**Role:** ORGANIZER (owner). Only DRAFT events can be deleted. A PUBLISHED event is\ncancelled instead with `PATCH /events/{eventId}/status`.\nIts zones are deleted first in InventoryService (`DELETE /internal/events/{eventId}/zones`).\nIf InventoryService does not answer, the event is not deleted and the answer is 503, so\nno zones are left without an event; the request can be retried.\n",
         "responses": {
           "204": {
             "description": "Event deleted."
@@ -4941,6 +4941,49 @@
                   "details": {
                     "status": "CANCELLED"
                   }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "InventoryService did not answer; the event was not deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }

@@ -229,6 +229,9 @@ paths:
       description: |
         **Role:** ORGANIZER (owner). Only DRAFT events can be deleted. A PUBLISHED event is
         cancelled instead with `PATCH /events/{eventId}/status`.
+        Its zones are deleted first in InventoryService (`DELETE /internal/events/{eventId}/zones`).
+        If InventoryService does not answer, the event is not deleted and the answer is 503, so
+        no zones are left without an event; the request can be retried.
       responses:
         '204':
           description: Event deleted.
@@ -240,6 +243,15 @@ paths:
           $ref: '#/components/responses/EventNotFound'
         '409':
           $ref: '#/components/responses/InvalidEventState'
+        '503':
+          description: InventoryService did not answer; the event was not deleted.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: SERVICE_UNAVAILABLE
+                message: Servicio temporalmente inactivo
 
   /events/{eventId}/status:
     parameters:
