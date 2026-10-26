@@ -4641,7 +4641,7 @@
             }
           },
           "404": {
-            "description": "Event not found (or DRAFT and the caller is not the owner).",
+            "description": "The event does not exist, or `venueId` is not an existing venue.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4676,9 +4676,19 @@
                     }
                   }
                 },
-                "example": {
-                  "code": "EVENT_NOT_FOUND",
-                  "message": "El evento no existe"
+                "examples": {
+                  "eventNotFound": {
+                    "value": {
+                      "code": "EVENT_NOT_FOUND",
+                      "message": "El evento no existe"
+                    }
+                  },
+                  "venueNotFound": {
+                    "value": {
+                      "code": "VENUE_NOT_FOUND",
+                      "message": "El recinto no existe"
+                    }
+                  }
                 }
               }
             }
@@ -5359,6 +5369,49 @@
                       "message": "Configure al menos una zona antes de publicar"
                     }
                   }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "InventoryService did not answer, so the zones could not be checked before publishing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }
@@ -6155,6 +6208,57 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid query parameter (`status`, `page` or `pageSize`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Algunos datos no son válidos, revise los campos marcados",
+                  "details": {
+                    "fields": [
+                      {
+                        "field": "status",
+                        "issue": "invalid_value"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing, invalid or expired token.",
             "content": {
@@ -6384,6 +6488,57 @@
                       }
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter (`page` or `pageSize`, for example `pageSize` above 100).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Algunos datos no son válidos, revise los campos marcados",
+                  "details": {
+                    "fields": [
+                      {
+                        "field": "pageSize",
+                        "issue": "invalid_value"
+                      }
+                    ]
+                  }
                 }
               }
             }

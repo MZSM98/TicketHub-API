@@ -206,7 +206,20 @@ paths:
         '403':
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
-          $ref: '#/components/responses/EventNotFound'
+          description: The event does not exist, or `venueId` is not an existing venue.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                eventNotFound:
+                  value:
+                    code: EVENT_NOT_FOUND
+                    message: El evento no existe
+                venueNotFound:
+                  value:
+                    code: VENUE_NOT_FOUND
+                    message: El recinto no existe
         '409':
           $ref: '#/components/responses/InvalidEventState'
     delete:
@@ -284,6 +297,15 @@ paths:
                   value:
                     code: EVENT_HAS_NO_ZONES
                     message: Configure al menos una zona antes de publicar
+        '503':
+          description: InventoryService did not answer, so the zones could not be checked before publishing.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: SERVICE_UNAVAILABLE
+                message: Servicio temporalmente inactivo
 
   /events/{eventId}/poster:
     parameters:
@@ -403,6 +425,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventPage'
+        '400':
+          description: Invalid query parameter (`status`, `page` or `pageSize`).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VALIDATION_ERROR
+                message: Algunos datos no son válidos, revise los campos marcados
+                details:
+                  fields:
+                    - field: status
+                      issue: invalid_value
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
@@ -433,6 +468,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VenuePage'
+        '400':
+          description: Invalid query parameter (`page` or `pageSize`, for example `pageSize` above 100).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VALIDATION_ERROR
+                message: Algunos datos no son válidos, revise los campos marcados
+                details:
+                  fields:
+                    - field: pageSize
+                      issue: invalid_value
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
@@ -750,6 +798,19 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Event'
+        '400':
+          description: The `ids` parameter is missing, is not a comma-separated list of ids, or has more than 100 ids.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VALIDATION_ERROR
+                message: Algunos datos no son válidos, revise los campos marcados
+                details:
+                  fields:
+                    - field: ids
+                      issue: invalid_value
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
 
