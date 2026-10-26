@@ -188,6 +188,23 @@ services:
     depends_on:
       [identity-service, catalog-service, inventory-service, purchase-service, ticket-service]
 
+  # Servidor mock para las apps (solo desarrollo): docker compose --profile mock up mock
+  mock:
+    image: stoplight/prism:5
+    profiles: [mock]
+    # -m false: el modo multiproceso de Prism falla con el Node 24 de la imagen (isPrimary).
+    command: ['mock', '-m', 'false', '-h', '0.0.0.0', '-p', '4010', '/spec/tickethub.openapi.json']
+    volumes:
+      - ./mock:/spec:ro
+    ports:
+      - '127.0.0.1:${MOCK_HOST_PORT:-4010}:4010'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO /dev/null http://127.0.0.1:4010/api/v1/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [tickethub]
+
 networks:
   tickethub:
     name: tickethub
