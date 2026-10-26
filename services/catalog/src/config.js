@@ -1,4 +1,3 @@
-// Configuración leída del entorno. Falla al arrancar si falta un secreto obligatorio.
 function required(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Falta la variable de entorno ${name}`);
@@ -9,9 +8,7 @@ export const config = {
   port: Number(process.env.PORT ?? 3002),
   jwtSecret: required('JWT_SECRET'),
   internalToken: required('INTERNAL_TOKEN'),
-  // Base pública (gateway) con la que se arma posterUrl.
   publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, ''),
-  // Tiempo máximo de espera para las llamadas /internal a otros servicios.
   internalTimeoutMs: Number(process.env.INTERNAL_TIMEOUT_MS ?? 3000),
   services: {
     identity: process.env.IDENTITY_SERVICE_URL ?? 'http://identity-service:3001',

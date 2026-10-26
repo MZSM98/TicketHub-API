@@ -1,4 +1,3 @@
-// Eventos y recintos: lectura, forma de respuesta (catalog.yaml Event, Venue) y errores propios.
 import { config } from './config.js';
 import { query } from './db.js';
 import { HttpError, parseId } from './http.js';
@@ -19,10 +18,8 @@ export const invalidEventState = (status) =>
 
 const iso = (date) => date.toISOString().replace('.000Z', 'Z');
 
-/** DATETIME no guarda milisegundos: se truncan para que lo guardado sea lo que se responde. */
 export const toSeconds = (date) => new Date(Math.floor(date.getTime() / 1000) * 1000);
 
-/** Texto para LIKE con %, _ y \ escapados. */
 export const likeContains = (text) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 export const VENUE_COLUMNS = 'id, name, address, city';
@@ -48,7 +45,6 @@ export function toEvent(row) {
     category: row.category,
     startsAt: iso(row.starts_at),
     status: row.status,
-    // El póster se sirve por el gateway; MySQL solo guarda poster_key.
     posterUrl: row.poster_key ? `${config.publicBaseUrl}/events/${row.id}/poster` : null,
     venue: {
       id: row.venue_id,
@@ -61,16 +57,11 @@ export function toEvent(row) {
   };
 }
 
-/** Fila del evento (con su recinto) o null. */
 export async function findEventRow(eventId) {
   const [row] = await query(`${EVENT_SELECT} WHERE e.id = ?`, [eventId]);
   return row ?? null;
 }
 
-/**
- * Evento de la ruta para operaciones "ORGANIZER (owner)": 404 EVENT_NOT_FOUND si no existe y
- * 403 NOT_EVENT_OWNER si es de otro organizador. El rol ya se revisó con requireRole.
- */
 export async function ownedEvent(req) {
   const eventId = parseId(req.params.eventId, eventNotFound);
   const row = await findEventRow(eventId);
@@ -79,10 +70,6 @@ export async function ownedEvent(req) {
   return row;
 }
 
-/**
- * Evento visible para quien llama (CU-04): DRAFT -> 404 y CANCELLED -> 410, salvo para el
- * organizador dueño y ADMIN.
- */
 export async function visibleEvent(req) {
   const eventId = parseId(req.params.eventId, eventNotFound);
   const row = await findEventRow(eventId);
@@ -97,6 +84,5 @@ export async function visibleEvent(req) {
   return row;
 }
 
-/** Errores de MySQL por llaves foráneas (fk_events_venue, fk_event_staff_event). */
 export const isRowReferenced = (err) => err?.errno === 1451;
 export const isMissingParent = (err) => err?.errno === 1452;

@@ -1,4 +1,3 @@
-// /venues/**: recintos sin dueño. ORGANIZER y ADMIN crean y editan; solo ADMIN borra.
 import { Router } from 'express';
 import { query } from '../db.js';
 import {
@@ -16,7 +15,6 @@ import { isRowReferenced, likeContains, toVenue, VENUE_COLUMNS, venueNotFound } 
 export const router = Router();
 const organizerOrAdmin = [authenticate, requireRole('ORGANIZER', 'ADMIN')];
 
-// catalog.yaml VenueInput (se recortan espacios para que "  " no cuente como dato).
 const VENUE_RULES = {
   name: { type: 'string', required: true, trim: true, minLength: 1, maxLength: 160 },
   address: { type: 'string', required: true, trim: true, minLength: 1, maxLength: 255 },
@@ -34,7 +32,6 @@ router.get('/venues', ...organizerOrAdmin, async (req, res) => {
   const conditions = ['TRUE'];
   const params = [];
   if (q.city) {
-    // La intercalación utf8mb4_0900_ai_ci ignora mayúsculas y acentos.
     conditions.push('city = ?');
     params.push(q.city);
   }
@@ -44,7 +41,6 @@ router.get('/venues', ...organizerOrAdmin, async (req, res) => {
   }
   const where = conditions.join(' AND ');
   const [{ total }] = await query(`SELECT COUNT(*) AS total FROM venues WHERE ${where}`, params);
-  // page y pageSize ya son enteros validados.
   const rows = await query(
     `SELECT ${VENUE_COLUMNS} FROM venues WHERE ${where}
      ORDER BY name, id LIMIT ${q.pageSize} OFFSET ${(q.page - 1) * q.pageSize}`,
@@ -85,7 +81,6 @@ router.delete('/venues/:venueId', authenticate, requireRole('ADMIN'), async (req
   try {
     result = await query('DELETE FROM venues WHERE id = ?', [venueId]);
   } catch (err) {
-    // fk_events_venue es RESTRICT: la base decide, sin carrera entre revisar y borrar.
     if (isRowReferenced(err)) {
       throw new HttpError(
         409,

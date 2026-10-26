@@ -1,6 +1,3 @@
-// /internal/**: solo entre servicios (X-Internal-Token). El gateway no las enruta.
-// requireInternal va en cada ruta, no en el prefijo, para que una ruta /internal desconocida
-// responda 404 y no 401.
 import { Router } from 'express';
 import { query } from '../db.js';
 import { notFound, parseId, requireInternal } from '../http.js';
@@ -10,7 +7,6 @@ export const router = Router();
 router.get('/internal/users/:userId', requireInternal, async (req, res) => {
   const user = await findUserById(parseId(req.params.userId));
   if (!user) throw notFound();
-  // También regresa cuentas borradas, con deletedAt.
   res.json(toUser(user, { withDeletedAt: true }));
 });
 

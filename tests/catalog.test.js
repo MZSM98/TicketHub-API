@@ -1,5 +1,3 @@
-// Pruebas de integración de CatalogService a través del API Gateway (catalog.yaml).
-// Requieren el stack levantado con docker-compose.test.yml; se ejecutan con `npm test` (ver README).
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { assertSchema, responseSchema } from './contract.js';
@@ -27,7 +25,6 @@ const internal = { 'x-internal-token': INTERNAL_TOKEN };
 const inDays = (days) =>
   new Date(Date.now() + days * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
 
-/** Error con el schema Error de common.yaml para respuestas que el contrato no lista. */
 function assertError(res, body, status, code) {
   assert.equal(res.status, status, JSON.stringify(body));
   assertSchema(ERROR_SCHEMA, body, `${status} ${code}`);
@@ -195,7 +192,6 @@ describe('CatalogService (catalog.yaml)', () => {
       assert.equal(event.posterUrl, null);
       assert.deepEqual(event.venue, s.venue);
       s.event = event;
-      // Un segundo evento del mismo organizador, más tarde, para el orden y los filtros.
       s.event2 = await expectContract('POST', '/events', 201, {
         token: s.orgA.token,
         body: { ...body, title: `Festival ${RUN}`, category: 'FESTIVAL', startsAt: inDays(60) },
@@ -252,7 +248,6 @@ describe('CatalogService (catalog.yaml)', () => {
       for (const token of [s.orgA.token, s.admin]) {
         assert.deepEqual(await expectContract('GET', path, 200, { token }, ev()), s.event);
       }
-      // Token opcional: si viene debe ser válido (lo revisa el gateway).
       await call('GET', path, { token: 'no-es-un-jwt' }).then(({ res }) =>
         assert.equal(res.status, 401),
       );
@@ -277,7 +272,6 @@ describe('CatalogService (catalog.yaml)', () => {
         const forbidden = await call(method, url, { token: s.admin, body });
         assertError(forbidden.res, forbidden.body, 403, 'FORBIDDEN');
       }
-      // Sigue igual después de los intentos.
       const same = await expectContract('GET', path, 200, { token: s.orgA.token }, ev());
       assert.deepEqual(same, s.event);
     });
@@ -394,7 +388,6 @@ describe('CatalogService (catalog.yaml)', () => {
         { field: 'category', issue: 'invalid_value' },
         { field: 'from', issue: 'invalid_format' },
       ]);
-      // Un DRAFT no aparece.
       const draft = await expectContract('POST', '/events', 201, {
         token: s.orgA.token,
         body: { ...input(), title: `Borrador ${RUN}` },
@@ -643,7 +636,6 @@ describe('CatalogService (catalog.yaml)', () => {
         ev('/status'),
       );
       assert.deepEqual(republish.details, { from: 'CANCELLED', to: 'PUBLISHED' });
-      // Ya no aparece en el catálogo público ni en los eventos del personal.
       const list = await expectContract('GET', `/events?q=${RUN}`, 200, {}, '/events');
       assert.equal(
         list.items.some((e) => e.id === s.event.id),

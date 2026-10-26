@@ -1,5 +1,3 @@
-// GET /admin/summary: resumen operativo global (CU-16). Une datos propios con dos llamadas
-// internas; si una falla, esa sección va en null y en unavailableSections (RNF-03).
 import { Router } from 'express';
 import { query } from '../db.js';
 import { authenticate, requireRole } from '../http.js';

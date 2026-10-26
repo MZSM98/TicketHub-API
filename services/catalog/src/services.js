@@ -1,9 +1,6 @@
-// Llamadas /internal a otros servicios (X-Internal-Token). Cada una tiene timeout para que un
-// servicio caído no deje colgada la petición (RNF-03).
 import { config } from './config.js';
 import { serviceUnavailable } from './http.js';
 
-/** GET interno; regresa { status, body } o null si el servicio no responde. */
 async function internalGet(service, path) {
   try {
     const res = await fetch(`${config.services[service]}/api/v1${path}`, {
@@ -23,7 +20,6 @@ async function internalGet(service, path) {
   }
 }
 
-/** Usuario de IdentityService `GET /internal/users/{userId}`, null si no existe. 503 si no responde. */
 export async function getUser(userId) {
   const result = await internalGet('identity', `/internal/users/${userId}`);
   if (result?.status === 404) return null;
@@ -31,7 +27,6 @@ export async function getUser(userId) {
   return result.body;
 }
 
-/** Número de zonas del evento en InventoryService `GET /internal/zones?eventId=`. 503 si no responde. */
 export async function countZones(eventId) {
   const result = await internalGet('inventory', `/internal/zones?eventId=${eventId}`);
   if (result?.status !== 200 || !Array.isArray(result.body)) throw serviceUnavailable();
@@ -40,7 +35,6 @@ export async function countZones(eventId) {
 
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 
-/** UserStats de IdentityService, o null si no está disponible o la respuesta no es válida. */
 export async function userStats() {
   const result = await internalGet('identity', '/internal/stats/users');
   const body = result?.status === 200 ? result.body : null;
@@ -59,7 +53,6 @@ export async function userStats() {
   };
 }
 
-/** SalesStats de PurchaseService, o null si no está disponible o la respuesta no es válida. */
 export async function salesStats() {
   const result = await internalGet('purchase', '/internal/stats/sales');
   const body = result?.status === 200 ? result.body : null;

@@ -1,6 +1,3 @@
-# Solo para `npm test`: CatalogService llama a un InventoryService y un PurchaseService falsos que
-# levanta la suite (tests/fakes.js) dentro del contenedor `tests`. Así se prueban publicar un evento
-# (requiere zonas) y el resumen CU-16 sin depender de servicios aún no implementados.
 services:
   catalog-service:
     environment:

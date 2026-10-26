@@ -1,7 +1,6 @@
 import mysql from 'mysql2/promise';
 import { config } from './config.js';
 
-// timezone 'Z': las columnas DATETIME se guardan y se leen en UTC.
 export const pool = mysql.createPool({ ...config.db, timezone: 'Z', connectionLimit: 10 });
 
 export async function query(sql, params = [], conn = pool) {

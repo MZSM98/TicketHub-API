@@ -1,4 +1,3 @@
-// Asignación del personal (STAFF) del organizador a sus eventos, y eventos del STAFF (CU-11).
 import { Router } from 'express';
 import { query } from '../db.js';
 import { authenticate, HttpError, notFound, parseId, requireRole } from '../http.js';
@@ -39,7 +38,6 @@ router.put('/events/:eventId/staff/:userId', ...organizer, async (req, res) => {
   const notOwnStaff = () =>
     new HttpError(403, 'NOT_OWN_STAFF', 'El usuario no pertenece a su personal');
   const userId = parseId(req.params.userId, notOwnStaff);
-  // Debe ser STAFF ACTIVE del organizador que llama (IdentityService es la fuente de verdad).
   const user = await getUser(userId);
   if (
     !user ||
@@ -51,7 +49,6 @@ router.put('/events/:eventId/staff/:userId', ...organizer, async (req, res) => {
     throw notOwnStaff();
   }
   try {
-    // La PK (event_id, user_id) hace idempotente la asignación: la segunda vez no cambia nada.
     await query('INSERT IGNORE INTO event_staff (event_id, user_id) VALUES (?, ?)', [
       event.id,
       userId,

@@ -1,6 +1,3 @@
-// InventoryService y PurchaseService falsos para las pruebas de CatalogService. Solo responden lo
-// que Catalog les pide (inventory.yaml GET /internal/zones, purchase.yaml GET /internal/stats/sales)
-// y registran el X-Internal-Token recibido. docker-compose.test.yml apunta Catalog a este servidor.
 import http from 'node:http';
 
 export const fakes = {

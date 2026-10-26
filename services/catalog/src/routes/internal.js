@@ -1,6 +1,3 @@
-// /internal/**: solo entre servicios (X-Internal-Token). El gateway no las enruta.
-// requireInternal va en cada ruta, no en el prefijo, para que una ruta /internal desconocida
-// responda 404 y no 401.
 import { Router } from 'express';
 import { query } from '../db.js';
 import { HttpError, parseId, parseIdList, requireInternal } from '../http.js';
@@ -12,7 +9,6 @@ export const router = Router();
 router.get('/internal/events', requireInternal, async (req, res) => {
   const ids = parseIdList(req.query.ids, 'ids', 100);
   const rows = await query(`${EVENT_SELECT} WHERE e.id IN (${ids.map(() => '?').join(',')})`, ids);
-  // Mismo orden que los ids pedidos; los que no existen se omiten.
   const byId = new Map(rows.map((row) => [row.id, row]));
   res.json(ids.filter((id) => byId.has(id)).map((id) => toEvent(byId.get(id))));
 });

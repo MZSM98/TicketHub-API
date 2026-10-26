@@ -1,5 +1,3 @@
-// Utilidades compartidas por las pruebas de integración: llamadas HTTP, validación contra el
-// contrato, sesiones y lectura de correos en Mailpit.
 import assert from 'node:assert/strict';
 import { assertContract } from './contract.js';
 
@@ -25,7 +23,6 @@ export async function call(method, path, { body, token, headers = {}, base = GAT
   return { res, body: text ? JSON.parse(text) : null };
 }
 
-/** Llama por el gateway y valida status + cuerpo contra el contrato (template = ruta del contrato). */
 export async function expectContract(method, path, status, options = {}, template = path) {
   const { res, body } = await call(method, path, options);
   assertContract(res, body, method, `/api/v1${template}`, status);
@@ -46,7 +43,6 @@ export async function findEmail(to) {
   throw new Error(`No llegó correo a ${to}`);
 }
 
-/** Contraseña temporal del correo de credenciales (no se imprime). */
 export async function temporaryPasswordFrom(message) {
   const res = await fetch(`${MAILPIT}/api/v1/message/${message.ID}`);
   const { Text } = await res.json();
@@ -60,7 +56,6 @@ export const login = (mail, password) =>
 
 export const CATALOG = process.env.CATALOG_URL ?? 'http://catalog-service:3002/api/v1';
 
-/** Cuenta creada por ADMIN (organizador) u ORGANIZER (personal), con sesión iniciada. */
 async function accountWithSession(path, token, body) {
   const created = await expectContract('POST', path, 201, { token, body });
   const password = await temporaryPasswordFrom(await findEmail(body.email));

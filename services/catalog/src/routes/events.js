@@ -1,5 +1,3 @@
-// /events/**, /organizer/events: catálogo público (CU-03, CU-04) y gestión de eventos del
-// organizador dueño (CU-12).
 import { Router } from 'express';
 import { query } from '../db.js';
 import {
@@ -34,7 +32,6 @@ import { countZones } from '../services.js';
 export const router = Router();
 const organizer = [authenticate, requireRole('ORGANIZER')];
 
-// catalog.yaml EventInput.
 const EVENT_RULES = {
   venueId: { type: 'id', required: true },
   title: { type: 'string', required: true, trim: true, minLength: 1, maxLength: 160 },
@@ -48,7 +45,6 @@ const EVENT_RULES = {
   },
 };
 
-// Transiciones permitidas de PATCH /events/{eventId}/status.
 const TRANSITIONS = { DRAFT: ['PUBLISHED', 'CANCELLED'], PUBLISHED: ['CANCELLED'], CANCELLED: [] };
 
 async function eventPage(where, params, paging, order) {
@@ -56,7 +52,6 @@ async function eventPage(where, params, paging, order) {
     `SELECT COUNT(*) AS total FROM events e JOIN venues v ON v.id = e.venue_id WHERE ${where}`,
     params,
   );
-  // page y pageSize ya son enteros validados.
   const rows = await query(
     `${EVENT_SELECT} WHERE ${where} ORDER BY ${order}
      LIMIT ${paging.pageSize} OFFSET ${(paging.page - 1) * paging.pageSize}`,
@@ -75,7 +70,6 @@ router.get('/events', async (req, res) => {
     to: { type: 'date-time' },
     ...PAGE_RULES,
   });
-  // Solo PUBLISHED y por venir (CU-03).
   const conditions = ["e.status = 'PUBLISHED'", 'e.starts_at > ?'];
   const params = [new Date()];
   if (q.q) {
@@ -87,7 +81,6 @@ router.get('/events', async (req, res) => {
     params.push(q.category);
   }
   if (q.city) {
-    // La intercalación utf8mb4_0900_ai_ci ignora mayúsculas y acentos.
     conditions.push('v.city = ?');
     params.push(q.city);
   }
@@ -150,7 +143,6 @@ router.put('/events/:eventId', ...organizer, async (req, res) => {
   const body = validate(req.body, EVENT_RULES);
   let result;
   try {
-    // La condición de estado evita editar un evento que se canceló mientras tanto.
     result = await query(
       `UPDATE events SET venue_id = ?, title = ?, description = ?, category = ?, starts_at = ?
        WHERE id = ? AND status <> 'CANCELLED'`,
@@ -203,7 +195,6 @@ router.patch('/events/:eventId/status', ...organizer, async (req, res) => {
   if (to === 'PUBLISHED' && (await countZones(event.id)) === 0) {
     throw new HttpError(409, 'EVENT_HAS_NO_ZONES', 'Configure al menos una zona antes de publicar');
   }
-  // Solo cambia si nadie lo cambió desde que se leyó (dos PATCH a la vez no se pisan).
   const result = await query('UPDATE events SET status = ? WHERE id = ? AND status = ?', [
     to,
     event.id,
@@ -220,12 +211,10 @@ router.get('/events/:eventId/poster', optionalAuth, async (req, _res) => {
   if (!event.poster_key) {
     throw new HttpError(404, 'POSTER_NOT_FOUND', 'El evento no tiene póster');
   }
-  // Pendiente: leer el objeto de MinIO (falta un cliente S3 en las dependencias).
   throw serviceUnavailable();
 });
 
 router.put('/events/:eventId/poster', ...organizer, async (req, _res) => {
   await ownedEvent(req);
-  // Pendiente: recibir multipart/form-data y guardar en MinIO (faltan dependencias aprobadas).
   throw serviceUnavailable();
 });
