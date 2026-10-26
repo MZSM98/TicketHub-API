@@ -667,6 +667,26 @@ paths:
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
 
+  /internal/events/{eventId}/zones:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    delete:
+      tags: [Internal]
+      operationId: internalDeleteEventZones
+      summary: Delete all zones of an event (internal, CU-12)
+      description: |
+        **Internal** (service-to-service). Called by CatalogService before it deletes a DRAFT
+        event, so no zones are left without an event. Seats are deleted with their zones. A DRAFT
+        event never had reservations or sales, because it cannot go back to DRAFT once published.
+        Idempotent: an event without zones, or one that does not exist, also answers 204.
+      security:
+        - internalAuth: []
+      responses:
+        '204':
+          description: The event has no zones anymore.
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:
