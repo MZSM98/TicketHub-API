@@ -86,6 +86,33 @@ Los nombres de los ejemplos (`seatUnavailable`, `activeReservation`, `declinedCa
 
 **Autenticación.** En las rutas protegidas, Prism solo revisa que venga el header `Authorization: Bearer ...`; si falta, responde 401. El token no se verifica, así que sirve cualquier texto, y el `accessToken` que regresa el login del mock no es un JWT real. Los roles y la propiedad de los recursos tampoco se revisan.
 
+## Autenticación
+
+- `POST /api/v1/auth/login` regresa un `accessToken` (JWT HS256, 1 hora) y un `refreshToken` (opaco, 7 días). Cada `POST /auth/refresh` revoca el refresh enviado y entrega un par nuevo (rotación); en la base solo se guarda el SHA-256 del refresh.
+- El gateway revisa la firma y la vigencia del access token en todas las rutas, salvo las públicas de los contratos (`security: []`): login, registro, refresh, logout, catálogo de eventos, disponibilidad y mapa de asientos. En `GET /events/{id}` y en el póster el token es opcional, pero si se envía debe ser válido. El header `Authorization` llega sin cambios al servicio, que revisa el rol y la propiedad del recurso.
+- `JWT_SECRET` lo comparten el gateway y los servicios. `/internal/**` no pasa por el gateway; entre servicios se usa el header `X-Internal-Token` con `INTERNAL_TOKEN`.
+
+## Correo (SMTP)
+
+IdentityService manda las credenciales temporales de organizadores (CU-15) y de personal con Nodemailer. En desarrollo usa Mailpit (`SMTP_HOST=mailpit`, `SMTP_PORT=1025`) y los correos se ven en `http://localhost:8025`. Para enviar correos reales con Gmail:
+
+1. Activa la verificación en dos pasos en la cuenta de Google.
+2. Crea una contraseña de aplicación en <https://myaccount.google.com/apppasswords>.
+3. En `.env`: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=<tu cuenta>`, `SMTP_PASS=<contraseña de aplicación>` y `MAIL_FROM="TicketHub <tu cuenta>"`.
+
+Si el SMTP falla, la cuenta se crea igual y la respuesta trae `credentialsEmailSent: false`.
+
+## Pruebas
+
+Las pruebas de integración usan `node:test` y `fetch`, y llaman a la API a través del gateway. Corren en un contenedor dentro de la red de Docker, así que también pueden llamar a `/internal/**` directamente y leer Mailpit:
+
+```bash
+docker compose up -d --build
+npm test   # crea el admin de .env si no existe y corre tests/ en el contenedor `tests`
+```
+
+Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
+
 ## Calidad de código
 
 ```bash
