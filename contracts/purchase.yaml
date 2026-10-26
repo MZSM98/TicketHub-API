@@ -1,0 +1,470 @@
+openapi: 3.0.3
+info:
+  title: TicketHub PurchaseService
+  version: 1.0.0
+  description: |
+    Payments (Stripe in test mode, behind a provider-agnostic module), purchase history and
+    organizer sales metrics.
+
+    Use cases: CU-08 (includes CU-09), CU-13. Internal stats serve CU-16.
+
+    **CU-08 flow** (sequence diagram): check reservation with InventoryService
+    (`GET /internal/reservations/{id}`) -> charge the payment provider -> save purchase ->
+    `POST /internal/reservations/{id}/confirm-sale` -> `POST /internal/tickets/issue` in TicketService.
+    If ticket issuance fails, the purchase is still PAID and the issue call is queued for retry
+    (CU-09 EX1); the response then says `ticketIssuance: PENDING`.
+
+    **Card data.** The client tokenizes the card with the provider SDK (or sends a provider test
+    payment method such as `pm_card_visa`). The API never receives or stores card numbers.
+
+    **Payment attempts.** One purchase row per reservation (`reservation_id` is unique). A declined
+    charge leaves it DECLINED and increments `failed_attempts`; a retry with the same reservation
+    updates the same row. When `failedAttempts` reaches `PAYMENT_MAX_ATTEMPTS` (default 3) the
+    reservation is released through `POST /internal/reservations/{id}/release`
+    ("Límite de intentos agotado"). `attemptsRemaining` in a 402 is `PAYMENT_MAX_ATTEMPTS - failedAttempts`.
+
+    **Event link.** Each purchase stores `event_id` (copied from the reservation) so CU-13 can
+    filter and group sales by event without calling InventoryService per purchase.
+
+    Roles per endpoint are listed in each operation as **Role:**.
+    Endpoints under `/internal/**` are service-to-service only; the API Gateway does not route them.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: API Gateway (clients)
+  - url: http://purchase-service:3004/api/v1
+    description: Direct service URL inside the Docker network (internal calls)
+security:
+  - bearerAuth: []
+tags:
+  - name: Purchases
+    description: Checkout and purchase history (CU-08).
+  - name: Sales
+    description: Organizer sales metrics (CU-13).
+  - name: Internal
+    description: Service-to-service endpoints. Not routed by the API Gateway.
+paths:
+  /purchases:
+    post:
+      tags: [Purchases]
+      operationId: processPurchase
+      summary: Pay an active reservation (CU-08)
+      description: |
+        **Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never
+        from the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessPurchaseRequest'
+            example:
+              reservationId: 5001
+              paymentMethodToken: pm_card_visa
+      responses:
+        '201':
+          description: Charge approved, seats SOLD, tickets issued or queued ("Compra exitosa").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseResult'
+              example:
+                purchase:
+                  id: 8001
+                  reservationId: 5001
+                  userId: 101
+                  eventId: 12
+                  total: '5000.00'
+                  currency: MXN
+                  paymentProvider: stripe
+                  paymentReference: pi_3Q0aBcDeFgHiJkLm
+                  status: PAID
+                  failedAttempts: 0
+                  createdAt: '2026-10-26T15:45:10Z'
+                ticketIssuance: ISSUED
+                ticketIds:
+                  - 3f1c9a6e-6b2d-4c8e-9a51-2f0d7c1e4b10
+                  - 8a7e2d10-1c4f-4b9a-b3e2-77c0d9f1a5e3
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '402':
+          description: The provider declined the charge (CU-08 FA1).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                declinedCanRetry:
+                  summary: Declined, the buyer can retry
+                  value:
+                    code: PAYMENT_DECLINED
+                    message: Pago declinado
+                    details:
+                      attemptsRemaining: 2
+                      providerDeclineCode: card_declined
+                declinedNoAttemptsLeft:
+                  summary: Last attempt declined, the reservation was released
+                  value:
+                    code: PAYMENT_ATTEMPTS_EXHAUSTED
+                    message: Pago declinado. Se agotaron los intentos y los asientos fueron liberados
+                    details:
+                      attemptsRemaining: 0
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          description: Reservation not found.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: RESERVATION_NOT_FOUND
+                message: La reserva no existe
+        '409':
+          description: The reservation is already paid, or it was cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                alreadyPaid:
+                  value:
+                    code: RESERVATION_ALREADY_PAID
+                    message: Esta reserva ya fue pagada
+                    details:
+                      purchaseId: 8001
+                cancelled:
+                  value:
+                    code: RESERVATION_NOT_ACTIVE
+                    message: La reserva ya no está activa
+        '410':
+          description: The reservation expired before payment; no charge was made.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: RESERVATION_EXPIRED
+                message: Tiempo agotado
+        '502':
+          description: The payment provider returned an invalid or unexpected response. No sale was confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: PAYMENT_GATEWAY_ERROR
+                message: Pasarela no disponible
+        '503':
+          description: The payment provider did not answer (timeout) or InventoryService is down (CU-08 EX1).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                gatewayTimeout:
+                  value:
+                    code: PAYMENT_GATEWAY_UNAVAILABLE
+                    message: Pasarela no disponible
+                inventoryDown:
+                  value:
+                    code: SERVICE_UNAVAILABLE
+                    message: Servicio temporalmente inactivo
+
+  /purchases/me:
+    get:
+      tags: [Purchases]
+      operationId: listMyPurchases
+      summary: List my purchases
+      description: '**Role:** BUYER. Only PAID purchases, newest first.'
+      parameters:
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of purchases.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchasePage'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /purchases/{purchaseId}:
+    parameters:
+      - name: purchaseId
+        in: path
+        required: true
+        schema:
+          $ref: './common.yaml#/components/schemas/Id'
+    get:
+      tags: [Purchases]
+      operationId: getMyPurchase
+      summary: Get one of my purchases
+      description: '**Role:** BUYER (owner).'
+      responses:
+        '200':
+          description: Purchase.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          description: Purchase not found.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: PURCHASE_NOT_FOUND
+                message: La compra no existe
+
+  /events/{eventId}/sales:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          $ref: './common.yaml#/components/schemas/Id'
+    get:
+      tags: [Sales]
+      operationId: getEventSales
+      summary: Sales dashboard of my event (CU-13)
+      description: |
+        **Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;
+        403 `NOT_EVENT_OWNER` for another organizer's event).
+        `purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`; `ticketsSold`, `capacity`
+        and `byZone` come from InventoryService `GET /internal/zones?eventId=`.
+      responses:
+        '200':
+          description: Metrics for charts and revenue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSales'
+              example:
+                eventId: 12
+                currency: MXN
+                purchases: 210
+                ticketsSold: 520
+                grossRevenue: '608800.00'
+                capacity: 2100
+                occupancyRate: 0.2476
+                byZone:
+                  - zoneId: 31
+                    name: VIP
+                    price: '2500.00'
+                    capacity: 100
+                    sold: 88
+                    reserved: 4
+                    revenue: '220000.00'
+                  - zoneId: 32
+                    name: General
+                    price: '900.00'
+                    capacity: 2000
+                    sold: 432
+                    reserved: 10
+                    revenue: '388800.00'
+                byDay:
+                  - date: '2026-10-25'
+                    purchases: 120
+                    revenue: '350000.00'
+                  - date: '2026-10-26'
+                    purchases: 90
+                    revenue: '258800.00'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          description: Event not found.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: EVENT_NOT_FOUND
+                message: El evento no existe
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+
+  /internal/stats/sales:
+    get:
+      tags: [Internal]
+      operationId: internalSalesStats
+      summary: Global sales totals (internal, CU-16)
+      description: '**Internal** (service-to-service). Called by CatalogService to build `GET /admin/summary`.'
+      security:
+        - internalAuth: []
+      responses:
+        '200':
+          description: Totals over all PAID purchases.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesStats'
+              example:
+                purchases: 3120
+                grossRevenue: '9876500.00'
+                currency: MXN
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'
+    internalAuth:
+      $ref: './common.yaml#/components/securitySchemes/internalAuth'
+  schemas:
+    PurchaseStatus:
+      type: string
+      enum: [PAID, DECLINED]
+    ProcessPurchaseRequest:
+      type: object
+      required: [reservationId, paymentMethodToken]
+      properties:
+        reservationId:
+          $ref: './common.yaml#/components/schemas/Id'
+        paymentMethodToken:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: |
+            Token or payment method id created by the provider SDK on the client, or a provider
+            test value (Stripe test mode: `pm_card_visa` approves, `pm_card_chargeDeclined` declines).
+          example: pm_card_visa
+    Purchase:
+      type: object
+      required: [id, reservationId, userId, eventId, total, currency, paymentProvider, paymentReference, status, failedAttempts, createdAt]
+      properties:
+        id:
+          $ref: './common.yaml#/components/schemas/Id'
+        reservationId:
+          $ref: './common.yaml#/components/schemas/Id'
+        userId:
+          $ref: './common.yaml#/components/schemas/Id'
+        eventId:
+          $ref: './common.yaml#/components/schemas/Id'
+        total:
+          $ref: './common.yaml#/components/schemas/Money'
+        currency:
+          $ref: './common.yaml#/components/schemas/Currency'
+        paymentProvider:
+          type: string
+          description: Provider that processed the charge (value of PAYMENT_PROVIDER).
+          example: stripe
+        paymentReference:
+          type: string
+          nullable: true
+          description: The provider's id for the charge. Null if the provider gave none.
+          example: pi_3Q0aBcDeFgHiJkLm
+        status:
+          $ref: '#/components/schemas/PurchaseStatus'
+        failedAttempts:
+          type: integer
+          minimum: 0
+          description: Declined charges for this reservation so far (max PAYMENT_MAX_ATTEMPTS, default 3).
+        createdAt:
+          type: string
+          format: date-time
+    PurchaseResult:
+      type: object
+      required: [purchase, ticketIssuance, ticketIds]
+      properties:
+        purchase:
+          $ref: '#/components/schemas/Purchase'
+        ticketIssuance:
+          type: string
+          enum: [ISSUED, PENDING]
+          description: PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).
+        ticketIds:
+          type: array
+          description: Empty when `ticketIssuance` is PENDING.
+          items:
+            type: string
+            format: uuid
+    PurchasePage:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Purchase'
+    SalesStats:
+      type: object
+      required: [purchases, grossRevenue, currency]
+      properties:
+        purchases:
+          type: integer
+        grossRevenue:
+          $ref: './common.yaml#/components/schemas/Money'
+        currency:
+          $ref: './common.yaml#/components/schemas/Currency'
+    EventSales:
+      type: object
+      required: [eventId, currency, purchases, ticketsSold, grossRevenue, capacity, occupancyRate, byZone, byDay]
+      properties:
+        eventId:
+          $ref: './common.yaml#/components/schemas/Id'
+        currency:
+          $ref: './common.yaml#/components/schemas/Currency'
+        purchases:
+          type: integer
+        ticketsSold:
+          type: integer
+          description: Sum of `soldCount` over the event zones.
+        grossRevenue:
+          $ref: './common.yaml#/components/schemas/Money'
+        capacity:
+          type: integer
+        occupancyRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: ticketsSold / capacity.
+        byZone:
+          type: array
+          items:
+            type: object
+            required: [zoneId, name, price, capacity, sold, reserved, revenue]
+            properties:
+              zoneId:
+                $ref: './common.yaml#/components/schemas/Id'
+              name:
+                type: string
+              price:
+                $ref: './common.yaml#/components/schemas/Money'
+              capacity:
+                type: integer
+              sold:
+                type: integer
+              reserved:
+                type: integer
+              revenue:
+                $ref: './common.yaml#/components/schemas/Money'
+        byDay:
+          type: array
+          description: One entry per day with sales (America/Mexico_City), oldest first.
+          items:
+            type: object
+            required: [date, purchases, revenue]
+            properties:
+              date:
+                type: string
+                format: date
+              purchases:
+                type: integer
+              revenue:
+                $ref: './common.yaml#/components/schemas/Money'

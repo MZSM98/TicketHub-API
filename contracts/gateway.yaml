@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: TicketHub API Gateway
+  version: 1.0.0
+  description: |
+    Single entry point for the JavaFX desktop client and the Android app. The gateway owns no
+    business data. It routes `/api/v1/**` to the services, checks the JWT signature and expiry on
+    protected routes, and forwards the `Authorization` header unchanged. Each service enforces roles
+    and ownership itself.
+
+    **Routing table** (gateway prefix -> service contract):
+
+    | Prefix | Service | Contract |
+    |---|---|---|
+    | `/auth/**`, `/users/**`, `/admin/users/**`, `/admin/organizers`, `/organizer/staff` | IdentityService :3001 | identity.yaml |
+    | `/events` (list, detail, CRUD, status, poster, staff), `/organizer/events`, `/venues/**`, `/staff/events`, `/admin/summary` | CatalogService :3002 | catalog.yaml |
+    | `/events/{id}/availability`, `/events/{id}/zones`, `/zones/**`, `/reservations/**` | InventoryService :3003 | inventory.yaml |
+    | `/purchases/**`, `/events/{id}/sales` | PurchaseService :3004 | purchase.yaml |
+    | `/tickets/**` | TicketService :3005 | ticket.yaml |
+    | `/internal/**` | not routed (404) | - |
+
+    When a service is down, the gateway answers 503 `SERVICE_UNAVAILABLE` for that service's routes
+    only; the other routes keep working (RNF-03).
+servers:
+  - url: http://localhost:8080/api/v1
+    description: API Gateway
+tags:
+  - name: Health
+    description: Gateway and downstream health.
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: gatewayHealth
+      summary: Health of the gateway and each service
+      description: '**Role:** public.'
+      security: []
+      responses:
+        '200':
+          description: The gateway is up. Each service reports UP or DOWN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: UP
+                services:
+                  identity: UP
+                  catalog: UP
+                  inventory: UP
+                  purchase: DOWN
+                  ticket: UP
+components:
+  schemas:
+    ServiceHealth:
+      type: string
+      enum: [UP, DOWN]
+    Health:
+      type: object
+      required: [status, services]
+      properties:
+        status:
+          type: string
+          enum: [UP]
+        services:
+          type: object
+          required: [identity, catalog, inventory, purchase, ticket]
+          properties:
+            identity:
+              $ref: '#/components/schemas/ServiceHealth'
+            catalog:
+              $ref: '#/components/schemas/ServiceHealth'
+            inventory:
+              $ref: '#/components/schemas/ServiceHealth'
+            purchase:
+              $ref: '#/components/schemas/ServiceHealth'
+            ticket:
+              $ref: '#/components/schemas/ServiceHealth'

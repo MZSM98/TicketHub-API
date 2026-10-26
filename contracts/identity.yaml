@@ -1,0 +1,767 @@
+openapi: 3.0.3
+info:
+  title: TicketHub IdentityService
+  version: 1.0.0
+  description: |
+    Accounts, authentication (JWT), user administration and organizer staff.
+
+    Use cases: CU-01, CU-02, CU-14, CU-15.
+
+    **Sessions.** Login returns a short-lived `accessToken` (JWT, `JWT_EXPIRES_IN`, 3600 s) and a
+    `refreshToken`: an opaque random string, valid `REFRESH_TOKEN_TTL_DAYS` (default 7). The server
+    stores only its hash in `refresh_tokens` (id, user_id, token_hash, expires_at, revoked_at,
+    created_at). `POST /auth/refresh` rotates it: the old one is revoked and a new pair is returned.
+    Refresh tokens are revoked when:
+    - the user logs out (`POST /auth/logout`, that token only);
+    - the user changes their password (every refresh token except the one sent in the request,
+      so other devices must log in again);
+    - an admin suspends or soft deletes the account (all of the user's refresh tokens).
+    An access token already issued keeps working until it expires (at most 1 hour).
+
+    Roles per endpoint are listed in each operation as **Role:**. Public endpoints have `security: []`.
+    Endpoints under `/internal/**` are service-to-service only; the API Gateway does not route them.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: API Gateway (clients)
+  - url: http://identity-service:3001/api/v1
+    description: Direct service URL inside the Docker network (internal calls)
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+    description: Registration and login (public).
+  - name: Me
+    description: The authenticated user's own account.
+  - name: Admin
+    description: User administration (ADMIN).
+  - name: Organizer staff
+    description: Event staff employed by an organizer (ORGANIZER).
+  - name: Internal
+    description: Service-to-service endpoints. Not routed by the API Gateway.
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: registerBuyer
+      summary: Register a buyer account (CU-01)
+      description: '**Role:** public. Creates an account with role BUYER and status ACTIVE.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterBuyerRequest'
+            example:
+              name: Ana López
+              email: ana.lopez@example.com
+              password: S3gura!2026
+      responses:
+        '201':
+          description: Account created ("Registro exitoso").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 101
+                name: Ana López
+                email: ana.lopez@example.com
+                role: BUYER
+                status: ACTIVE
+                organizationName: null
+                employerId: null
+                mustChangePassword: false
+                createdAt: '2026-10-26T15:10:00Z'
+                updatedAt: '2026-10-26T15:10:00Z'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/EmailAlreadyRegistered'
+        '500':
+          $ref: './common.yaml#/components/responses/InternalError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Log in and get a JWT (CU-02)
+      description: '**Role:** public. Works for every role.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: ana.lopez@example.com
+              password: S3gura!2026
+      responses:
+        '200':
+          description: Credentials are valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDEiLCJyb2xlIjoiQlVZRVIifQ.signature
+                tokenType: Bearer
+                expiresIn: 3600
+                refreshToken: q8Zt3vN1xYb7Lm0Pc4Rk9sWd2Fh6Ju5EaGo1TiVn8Mw
+                refreshExpiresIn: 604800
+                user:
+                  id: 101
+                  name: Ana López
+                  email: ana.lopez@example.com
+                  role: BUYER
+                  status: ACTIVE
+                  organizationName: null
+                  employerId: null
+                  mustChangePassword: false
+                  createdAt: '2026-10-26T15:10:00Z'
+                  updatedAt: '2026-10-26T15:10:00Z'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          description: Wrong email or password, or the account was deleted.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: INVALID_CREDENTIALS
+                message: Credenciales inválidas
+        '403':
+          $ref: '#/components/responses/AccountSuspended'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshSession
+      summary: Get a new access token with a refresh token
+      description: |
+        **Role:** public (the refresh token is the credential). Rotation: the sent token is revoked
+        and a new access + refresh pair is returned. Sending a revoked token again fails with 401.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+            example:
+              refreshToken: q8Zt3vN1xYb7Lm0Pc4Rk9sWd2Fh6Ju5EaGo1TiVn8Mw
+      responses:
+        '200':
+          description: New token pair.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+              example:
+                accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDEiLCJyb2xlIjoiQlVZRVIifQ.signature2
+                tokenType: Bearer
+                expiresIn: 3600
+                refreshToken: Vb2Kx9Qm4Tz7Hn1Rc6Yw3Ld8Fs5Pj0GaUe2NoXi7Ck
+                refreshExpiresIn: 604800
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidRefreshToken'
+        '403':
+          $ref: '#/components/responses/AccountSuspended'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Log out (revoke a refresh token)
+      description: |
+        **Role:** public (the refresh token is the credential). Revokes the sent refresh token.
+        Idempotent: an unknown, expired or already revoked token also returns 204. The client
+        discards its access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+            example:
+              refreshToken: q8Zt3vN1xYb7Lm0Pc4Rk9sWd2Fh6Ju5EaGo1TiVn8Mw
+      responses:
+        '204':
+          description: Refresh token revoked.
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+
+  /users/me:
+    get:
+      tags: [Me]
+      operationId: getMe
+      summary: Get the authenticated user
+      description: '**Role:** any authenticated user.'
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
+  /users/me/password:
+    put:
+      tags: [Me]
+      operationId: changeMyPassword
+      summary: Change my password
+      description: |
+        **Role:** any authenticated user. Clears `mustChangePassword`, which is set for organizers
+        and staff that received a generated password by email. Revokes all of the user's refresh
+        tokens except `refreshToken` if sent (the current device stays logged in; other sessions end).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+            example:
+              currentPassword: Tmp-8f3K2q
+              newPassword: MiNueva!2026
+              refreshToken: q8Zt3vN1xYb7Lm0Pc4Rk9sWd2Fh6Ju5EaGo1TiVn8Mw
+      responses:
+        '204':
+          description: Password changed.
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          description: Token invalid, or `currentPassword` is wrong.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                wrongPassword:
+                  value:
+                    code: INVALID_CREDENTIALS
+                    message: La contraseña actual no es correcta
+                badToken:
+                  value:
+                    code: UNAUTHORIZED
+                    message: Sesión no válida o expirada, inicie sesión de nuevo
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      operationId: adminListUsers
+      summary: List accounts (CU-14)
+      description: '**Role:** ADMIN. Soft-deleted accounts are excluded unless `includeDeleted=true`.'
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: './common.yaml#/components/schemas/Role'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserStatus'
+        - name: q
+          in: query
+          description: Text search on name, email or organization name.
+          schema:
+            type: string
+        - name: includeDeleted
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /admin/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      tags: [Admin]
+      operationId: adminDeleteUser
+      summary: Soft delete an account (CU-14)
+      description: |
+        **Role:** ADMIN. Sets `deletedAt`; the row is kept. Revokes all of the user's refresh tokens.
+        An admin cannot delete their own account.
+      responses:
+        '204':
+          description: Account soft deleted.
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './common.yaml#/components/responses/NotFound'
+        '409':
+          description: The admin tried to delete their own account.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: CANNOT_MODIFY_SELF
+                message: No puede eliminar su propia cuenta
+
+  /admin/users/{userId}/status:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags: [Admin]
+      operationId: adminChangeUserStatus
+      summary: Change account status (CU-14)
+      description: |
+        **Role:** ADMIN. ACTIVE <-> SUSPENDED. A suspended user cannot log in or refresh. Suspending
+        revokes all of the user's refresh tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/UserStatus'
+            example:
+              status: SUSPENDED
+      responses:
+        '200':
+          description: Status updated ("Estado actualizado").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './common.yaml#/components/responses/NotFound'
+        '409':
+          description: The admin tried to suspend their own account.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: CANNOT_MODIFY_SELF
+                message: No puede cambiar el estado de su propia cuenta
+
+  /admin/organizers:
+    post:
+      tags: [Admin]
+      operationId: adminRegisterOrganizer
+      summary: Register an organizer (CU-15)
+      description: |
+        **Role:** ADMIN. Creates a user with role ORGANIZER, generates a temporary password,
+        sets `mustChangePassword=true` and emails the credentials (SMTP; Mailpit in development).
+        The password is never returned in the response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterOrganizerRequest'
+            example:
+              name: Carlos Méndez
+              email: contacto@ocesa-demo.mx
+              organizationName: Producciones Demo S.A. de C.V.
+      responses:
+        '201':
+          description: Organizer created and email queued ("Organizador creado").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedWithEmailResponse'
+              example:
+                user:
+                  id: 7
+                  name: Carlos Méndez
+                  email: contacto@ocesa-demo.mx
+                  role: ORGANIZER
+                  status: ACTIVE
+                  organizationName: Producciones Demo S.A. de C.V.
+                  employerId: null
+                  mustChangePassword: true
+                  createdAt: '2026-10-26T15:20:00Z'
+                  updatedAt: '2026-10-26T15:20:00Z'
+                credentialsEmailSent: true
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/EmailAlreadyRegistered'
+
+  /organizer/staff:
+    get:
+      tags: [Organizer staff]
+      operationId: listMyStaff
+      summary: List my event staff
+      description: '**Role:** ORGANIZER. Only users with role STAFF whose `employerId` is the caller.'
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserStatus'
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of staff users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+              example:
+                items:
+                  - id: 55
+                    name: Luis Pérez
+                    email: luis.perez@ocesa-demo.mx
+                    role: STAFF
+                    status: ACTIVE
+                    organizationName: null
+                    employerId: 7
+                    mustChangePassword: true
+                    createdAt: '2026-10-26T16:00:00Z'
+                    updatedAt: '2026-10-26T16:00:00Z'
+                page: 1
+                pageSize: 20
+                totalItems: 1
+                totalPages: 1
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+    post:
+      tags: [Organizer staff]
+      operationId: registerMyStaff
+      summary: Register a staff member for my organization
+      description: |
+        **Role:** ORGANIZER. Creates a STAFF user with `employerId` = caller, a generated temporary
+        password and `mustChangePassword=true`, and emails the credentials (same flow as CU-15).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterStaffRequest'
+            example:
+              name: Luis Pérez
+              email: luis.perez@ocesa-demo.mx
+      responses:
+        '201':
+          description: Staff user created and email queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedWithEmailResponse'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/EmailAlreadyRegistered'
+
+  /internal/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Internal]
+      operationId: internalGetUser
+      summary: Get a user by id (internal)
+      description: |
+        **Internal** (service-to-service). Used by CatalogService to check that a user is STAFF
+        employed by a given organizer before assigning them to an event.
+      security:
+        - internalAuth: []
+      responses:
+        '200':
+          description: User (also returned when soft deleted, with `deletedAt` set).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './common.yaml#/components/responses/NotFound'
+
+  /internal/stats/users:
+    get:
+      tags: [Internal]
+      operationId: internalUserStats
+      summary: User counts for the admin summary (internal, CU-16)
+      description: '**Internal** (service-to-service). Called by CatalogService to build `GET /admin/summary`.'
+      security:
+        - internalAuth: []
+      responses:
+        '200':
+          description: Counts of non-deleted users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStats'
+              example:
+                total: 1250
+                byRole:
+                  BUYER: 1200
+                  STAFF: 35
+                  ORGANIZER: 12
+                  ADMIN: 3
+                suspended: 8
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'
+    internalAuth:
+      $ref: './common.yaml#/components/securitySchemes/internalAuth'
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: './common.yaml#/components/schemas/Id'
+  responses:
+    EmailAlreadyRegistered:
+      description: The email already belongs to an account (including soft-deleted ones).
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: EMAIL_ALREADY_REGISTERED
+            message: El correo ya está registrado
+    InvalidRefreshToken:
+      description: The refresh token is unknown, expired or revoked, or the account was deleted.
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: INVALID_REFRESH_TOKEN
+            message: Sesión expirada, inicie sesión de nuevo
+    AccountSuspended:
+      description: The account is suspended.
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: ACCOUNT_SUSPENDED
+            message: Su cuenta está suspendida, contacte al administrador
+  schemas:
+    UserStatus:
+      type: string
+      enum: [ACTIVE, SUSPENDED]
+    Email:
+      type: string
+      format: email
+      maxLength: 255
+    Password:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 72
+      description: At least 8 characters. Stored only as a bcrypt hash.
+    RegisterBuyerRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          $ref: '#/components/schemas/Password'
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          type: string
+          format: password
+    TokenPair:
+      type: object
+      required: [accessToken, tokenType, expiresIn, refreshToken, refreshExpiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: 'JWT sent as `Authorization: Bearer <token>`.'
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Seconds until the access token expires (JWT_EXPIRES_IN, default 3600).
+        refreshToken:
+          type: string
+          description: Opaque random string. Store it securely on the device; the server keeps only its hash.
+        refreshExpiresIn:
+          type: integer
+          description: Seconds until the refresh token expires (REFRESH_TOKEN_TTL_DAYS, default 7 = 604800).
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/TokenPair'
+        - type: object
+          required: [user]
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+        newPassword:
+          $ref: '#/components/schemas/Password'
+        refreshToken:
+          type: string
+          description: Optional. The current device's refresh token, kept valid; all others are revoked.
+    RegisterOrganizerRequest:
+      type: object
+      required: [name, email, organizationName]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Contact person.
+        email:
+          $ref: '#/components/schemas/Email'
+        organizationName:
+          type: string
+          minLength: 1
+          maxLength: 160
+    RegisterStaffRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          $ref: '#/components/schemas/Email'
+    CreatedWithEmailResponse:
+      type: object
+      required: [user, credentialsEmailSent]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        credentialsEmailSent:
+          type: boolean
+          description: False if the SMTP server failed; the account exists and the admin can retry later.
+    User:
+      type: object
+      required: [id, name, email, role, status, mustChangePassword, createdAt, updatedAt]
+      properties:
+        id:
+          $ref: './common.yaml#/components/schemas/Id'
+        name:
+          type: string
+          example: Ana López
+        email:
+          $ref: '#/components/schemas/Email'
+        role:
+          $ref: './common.yaml#/components/schemas/Role'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        organizationName:
+          type: string
+          nullable: true
+          description: Only for ORGANIZER.
+        employerId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Only for STAFF. Id of the organizer that employs them.
+        mustChangePassword:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Only present in admin listings with `includeDeleted=true`.
+    UserPage:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+    UserStats:
+      type: object
+      required: [total, byRole, suspended]
+      properties:
+        total:
+          type: integer
+        byRole:
+          type: object
+          required: [BUYER, STAFF, ORGANIZER, ADMIN]
+          properties:
+            BUYER:
+              type: integer
+            STAFF:
+              type: integer
+            ORGANIZER:
+              type: integer
+            ADMIN:
+              type: integer
+        suspended:
+          type: integer

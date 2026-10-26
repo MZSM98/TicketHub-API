@@ -1,0 +1,24 @@
+# Lint config for the contracts. Run from this folder: npx @redocly/cli lint
+apis:
+  gateway:
+    root: gateway.yaml
+    rules:
+      # /health is public and has no client error case.
+      operation-4xx-response: off
+  identity:
+    root: identity.yaml
+  catalog:
+    root: catalog.yaml
+  inventory:
+    root: inventory.yaml
+  purchase:
+    root: purchase.yaml
+  ticket:
+    root: ticket.yaml
+extends:
+  - recommended-strict
+rules:
+  # Course project: no license to declare.
+  info-license: off
+  # Servers point at localhost / Docker network names on purpose.
+  no-server-example.com: off
