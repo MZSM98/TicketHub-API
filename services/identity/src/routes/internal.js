@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db.js';
-import { notFound, parseId, requireInternal } from '../http.js';
+import { query } from '@tickethub/common/db';
+import { notFound, parseId, requireInternal } from '@tickethub/common/http';
 import { findUserById, toUser } from '../users.js';
 
 export const router = Router();

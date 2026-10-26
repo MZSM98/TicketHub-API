@@ -5,10 +5,12 @@ WORKDIR /app
 
 # Solo las dependencias de este servicio, usando el lockfile de la raíz (npm workspaces).
 COPY package.json package-lock.json ./
+COPY services/common/package.json services/common/
 COPY services/identity/package.json services/identity/
-RUN npm ci --omit=dev --workspace services/identity --include-workspace-root=false \
+RUN npm ci --omit=dev --workspace services/common --workspace services/identity --include-workspace-root=false \
   && npm cache clean --force
 
+COPY services/common/src services/common/src
 COPY services/identity/src services/identity/src
 
 USER node

@@ -1,6 +1,12 @@
 // /organizer/staff: el personal de evento que emplea el organizador autenticado.
 import { Router } from 'express';
-import { authenticate, PAGE_RULES, parseQuery, requireRole, validate } from '../http.js';
+import {
+  authenticate,
+  PAGE_RULES,
+  parseQuery,
+  requireRole,
+  validate,
+} from '@tickethub/common/http';
 import { createWithEmailedCredentials, userPage } from './admin.js';
 
 export const router = Router();

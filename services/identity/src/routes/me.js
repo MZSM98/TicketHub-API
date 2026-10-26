@@ -1,8 +1,9 @@
 // /users/me/**: la cuenta del usuario autenticado.
 import bcrypt from 'bcrypt';
 import { Router } from 'express';
-import { query, transaction } from '../db.js';
-import { authenticate, HttpError, NEW_PASSWORD_RULE, unauthorized, validate } from '../http.js';
+import { query, transaction } from '@tickethub/common/db';
+import { authenticate, HttpError, unauthorized, validate } from '@tickethub/common/http';
+import { NEW_PASSWORD_RULE } from '../passwords.js';
 import { hashToken, revokeAllRefreshTokens } from '../tokens.js';
 import { findUserById, hashPassword, toUser } from '../users.js';
 

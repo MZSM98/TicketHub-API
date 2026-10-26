@@ -10,15 +10,7 @@ export const config = {
   jwtSecret: required('JWT_SECRET'),
   jwtExpiresIn: Number(process.env.JWT_EXPIRES_IN ?? 3600),
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7),
-  internalToken: required('INTERNAL_TOKEN'),
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS ?? 10),
-  db: {
-    host: process.env.MYSQL_HOST ?? 'mysql',
-    port: Number(process.env.MYSQL_PORT ?? 3306),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-  },
   smtp: {
     host: process.env.SMTP_HOST ?? 'mailpit',
     port: Number(process.env.SMTP_PORT ?? 1025),
