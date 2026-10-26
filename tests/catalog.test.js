@@ -147,8 +147,14 @@ describe('CatalogService (catalog.yaml)', () => {
         byCity.items.map((v) => v.id),
         [s.venue.id],
       );
-      const bad = await call('GET', '/venues?pageSize=500', { token: s.admin });
-      assertError(bad.res, bad.body, 400, 'VALIDATION_ERROR');
+      const bad = await expectContract(
+        'GET',
+        '/venues?pageSize=500',
+        400,
+        { token: s.admin },
+        '/venues',
+      );
+      assert.deepEqual(bad.details.fields, [{ field: 'pageSize', issue: 'invalid_value' }]);
       await expectContract('GET', '/venues', 403, { token: s.staffA.token });
     });
 
@@ -309,9 +315,12 @@ describe('CatalogService (catalog.yaml)', () => {
       assert.deepEqual(fakes.tokens, [INTERNAL_TOKEN], 'Catalog manda X-Internal-Token');
 
       fakes.inventoryUp = false;
-      const down = await call('PATCH', path, publish);
-      fakes.inventoryUp = true;
-      assertError(down.res, down.body, 503, 'SERVICE_UNAVAILABLE');
+      try {
+        const down = await expectContract('PATCH', path, 503, publish, ev('/status'));
+        assert.equal(down.code, 'SERVICE_UNAVAILABLE');
+      } finally {
+        fakes.inventoryUp = true;
+      }
 
       fakes.zonesByEvent.set(s.event.id, 2);
       fakes.zonesByEvent.set(s.event2.id, 1);
@@ -422,6 +431,14 @@ describe('CatalogService (catalog.yaml)', () => {
         [s.eventB.id],
       );
       await expectContract('GET', '/organizer/events', 403, { token: s.admin });
+      const bad = await expectContract(
+        'GET',
+        '/organizer/events?status=BORRADOR',
+        400,
+        { token: s.orgA.token },
+        '/organizer/events',
+      );
+      assert.deepEqual(bad.details.fields, [{ field: 'status', issue: 'invalid_value' }]);
     });
 
     test('DELETE /events/{id}: PUBLISHED -> 409; DRAFT -> 204 y luego 404', async () => {
