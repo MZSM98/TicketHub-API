@@ -140,7 +140,7 @@
                     "format": "password",
                     "minLength": 8,
                     "maxLength": 72,
-                    "description": "At least 8 characters. Stored only as a bcrypt hash."
+                    "description": "At least 8 characters and at most 72 bytes in UTF-8. The limit is in bytes because bcrypt\nonly uses the first 72 bytes: accented letters and ñ take 2 bytes each, so a password with\nthem allows fewer than 72 characters. Over the limit the API answers 400 `VALIDATION_ERROR`\nwith issue `too_long`. Stored only as a bcrypt hash.\n"
                   }
                 }
               },
@@ -1277,7 +1277,7 @@
                     "format": "password",
                     "minLength": 8,
                     "maxLength": 72,
-                    "description": "At least 8 characters. Stored only as a bcrypt hash."
+                    "description": "At least 8 characters and at most 72 bytes in UTF-8. The limit is in bytes because bcrypt\nonly uses the first 72 bytes: accented letters and ñ take 2 bytes each, so a password with\nthem allows fewer than 72 characters. Over the limit the API answers 400 `VALIDATION_ERROR`\nwith issue `too_long`. Stored only as a bcrypt hash.\n"
                   },
                   "refreshToken": {
                     "type": "string",
@@ -1600,6 +1600,57 @@
                       }
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter (`role`, `status`, `includeDeleted`, `page` or `pageSize`, for example `pageSize` above 100).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Algunos datos no son válidos, revise los campos marcados",
+                  "details": {
+                    "fields": [
+                      {
+                        "field": "pageSize",
+                        "issue": "invalid_value"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -2788,6 +2839,57 @@
                   "pageSize": 20,
                   "totalItems": 1,
                   "totalPages": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter (`status`, `page` or `pageSize`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Algunos datos no son válidos, revise los campos marcados",
+                  "details": {
+                    "fields": [
+                      {
+                        "field": "status",
+                        "issue": "invalid_value"
+                      }
+                    ]
+                  }
                 }
               }
             }

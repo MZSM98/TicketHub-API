@@ -290,6 +290,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserPage'
+        '400':
+          description: Invalid query parameter (`role`, `status`, `includeDeleted`, `page` or `pageSize`, for example `pageSize` above 100).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VALIDATION_ERROR
+                message: Algunos datos no son válidos, revise los campos marcados
+                details:
+                  fields:
+                    - field: pageSize
+                      issue: invalid_value
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
@@ -455,6 +468,19 @@ paths:
                 pageSize: 20
                 totalItems: 1
                 totalPages: 1
+        '400':
+          description: Invalid query parameter (`status`, `page` or `pageSize`).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VALIDATION_ERROR
+                message: Algunos datos no son válidos, revise los campos marcados
+                details:
+                  fields:
+                    - field: status
+                      issue: invalid_value
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
@@ -595,7 +621,11 @@ components:
       format: password
       minLength: 8
       maxLength: 72
-      description: At least 8 characters. Stored only as a bcrypt hash.
+      description: |
+        At least 8 characters and at most 72 bytes in UTF-8. The limit is in bytes because bcrypt
+        only uses the first 72 bytes: accented letters and ñ take 2 bytes each, so a password with
+        them allows fewer than 72 characters. Over the limit the API answers 400 `VALIDATION_ERROR`
+        with issue `too_long`. Stored only as a bcrypt hash.
     RegisterBuyerRequest:
       type: object
       required: [name, email, password]
