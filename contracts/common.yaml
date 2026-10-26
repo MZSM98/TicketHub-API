@@ -1,0 +1,178 @@
+# Shared components referenced by every service contract.
+# Not a standalone API: it only holds reusable components.
+openapi: 3.0.3
+info:
+  title: TicketHub - Shared components
+  version: 1.0.0
+  description: Shared schemas, parameters, responses and security schemes for the TicketHub contracts.
+paths: {}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Access token returned by `POST /auth/login` or `POST /auth/refresh` (1 hour). Claims: `sub` (user id), `role`
+        (BUYER | STAFF | ORGANIZER | ADMIN), `employerId` (STAFF only), `exp`.
+    internalAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: |
+        Shared secret for service-to-service calls (`/internal/**`). The API Gateway never
+        routes `/internal/**`, so clients cannot reach these endpoints.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number, starting at 1.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Items per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    Id:
+      type: integer
+      format: int64
+      minimum: 1
+      example: 42
+    Money:
+      type: string
+      description: Decimal amount with two decimals, sent as a string to avoid floating point errors.
+      pattern: '^\d+\.\d{2}$'
+      example: '1500.00'
+    Currency:
+      type: string
+      enum: [MXN]
+      example: MXN
+    Role:
+      type: string
+      enum: [BUYER, STAFF, ORGANIZER, ADMIN]
+    PageMeta:
+      type: object
+      required: [page, pageSize, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 20
+        totalItems:
+          type: integer
+          example: 57
+        totalPages:
+          type: integer
+          example: 3
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code. Clients branch on this, never on `message`.
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable message in Spanish, ready to show in the UI.
+          example: Por favor llene todos los campos requeridos
+        details:
+          type: object
+          description: Optional extra data (invalid fields, unavailable seats, etc.).
+          additionalProperties: true
+          example:
+            fields:
+              - field: title
+                issue: required
+
+  responses:
+    ValidationError:
+      description: Missing or invalid fields.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: VALIDATION_ERROR
+            message: Por favor llene todos los campos requeridos
+            details:
+              fields:
+                - field: title
+                  issue: required
+    Unauthorized:
+      description: Missing, invalid or expired token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Sesión no válida o expirada, inicie sesión de nuevo
+    Forbidden:
+      description: The authenticated user does not have the required role or does not own the resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FORBIDDEN
+            message: No tiene permisos para realizar esta acción
+    NotEventOwner:
+      description: |
+        The caller lacks the required role (`FORBIDDEN`), or is an ORGANIZER but the event belongs
+        to another organizer (`NOT_EVENT_OWNER`). Ownership is checked against the event's
+        `organizerId`; venues have no owner, events do.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            notEventOwner:
+              value:
+                code: NOT_EVENT_OWNER
+                message: Solo el organizador dueño del evento puede modificarlo
+                details:
+                  eventId: 12
+            wrongRole:
+              value:
+                code: FORBIDDEN
+                message: No tiene permisos para realizar esta acción
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Recurso no encontrado
+    InternalError:
+      description: Unexpected server error (for example, the database is down).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INTERNAL_ERROR
+            message: Error interno, intente más tarde
+    ServiceUnavailable:
+      description: A downstream service is not reachable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: SERVICE_UNAVAILABLE
+            message: Servicio temporalmente inactivo

@@ -1,0 +1,999 @@
+openapi: 3.0.3
+info:
+  title: TicketHub CatalogService
+  version: 1.0.0
+  description: |
+    Venues, events (with poster in MinIO), event staff assignment and the admin global summary.
+
+    Use cases: CU-03, CU-04, CU-12, CU-16, plus event staff assignment needed by CU-11.
+
+    Roles per endpoint are listed in each operation as **Role:**. Public endpoints have `security: []`.
+    Endpoints under `/internal/**` are service-to-service only; the API Gateway does not route them.
+
+    **Event ownership.** Every operation marked "ORGANIZER (owner)" compares the caller's JWT `sub`
+    with the event's `organizerId` and answers 403 `NOT_EVENT_OWNER` for another organizer's event.
+    Venues have no owner: any ORGANIZER or ADMIN can create and edit them; only ADMIN deletes them.
+
+    **Why CU-16 lives here:** "Consultar catálogo administrativo" is a view over the catalog
+    (events by status, upcoming events, venues). CatalogService owns that data and completes the
+    summary with two internal calls: user counts from IdentityService and sales totals from
+    PurchaseService. If one of them is down, the summary still returns with that block set to
+    `null` and listed in `unavailableSections` (partial failure tolerance, RNF-03).
+servers:
+  - url: http://localhost:8080/api/v1
+    description: API Gateway (clients)
+  - url: http://catalog-service:3002/api/v1
+    description: Direct service URL inside the Docker network (internal calls)
+security:
+  - bearerAuth: []
+tags:
+  - name: Events
+    description: Public catalog and organizer event management.
+  - name: Venues
+    description: Venues (ORGANIZER, ADMIN).
+  - name: Event staff
+    description: Assignment of an organizer's staff to the organizer's events.
+  - name: Admin
+    description: Admin global summary (CU-16).
+  - name: Internal
+    description: Service-to-service endpoints. Not routed by the API Gateway.
+paths:
+  /events:
+    get:
+      tags: [Events]
+      operationId: listEvents
+      summary: Browse published events (CU-03)
+      description: |
+        **Role:** public. Returns only PUBLISHED events whose `startsAt` is in the future, sorted by
+        `startsAt` ascending. An empty `items` array means "No se encontraron eventos".
+      security: []
+      parameters:
+        - name: q
+          in: query
+          description: Text search on title and description.
+          schema:
+            type: string
+          example: rock
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventCategory'
+        - name: city
+          in: query
+          schema:
+            type: string
+          example: Guadalajara
+        - name: venueId
+          in: query
+          schema:
+            $ref: './common.yaml#/components/schemas/Id'
+        - name: from
+          in: query
+          description: Events starting on or after this date-time.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-11-01T00:00:00Z'
+        - name: to
+          in: query
+          description: Events starting on or before this date-time.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-12-31T23:59:59Z'
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+              example:
+                items:
+                  - id: 12
+                    organizerId: 7
+                    title: Noche de Rock Nacional
+                    description: Concierto con bandas invitadas.
+                    category: CONCERT
+                    startsAt: '2026-12-05T02:00:00Z'
+                    status: PUBLISHED
+                    posterUrl: http://localhost:8080/api/v1/events/12/poster
+                    venue:
+                      id: 3
+                      name: Auditorio Telmex
+                      address: Av. Obreros de Cananea 1500
+                      city: Zapopan
+                    createdAt: '2026-10-20T18:00:00Z'
+                    updatedAt: '2026-10-21T18:00:00Z'
+                page: 1
+                pageSize: 20
+                totalItems: 1
+                totalPages: 1
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '500':
+          $ref: './common.yaml#/components/responses/InternalError'
+    post:
+      tags: [Events]
+      operationId: createEvent
+      summary: Create an event (CU-12)
+      description: |
+        **Role:** ORGANIZER. Created as DRAFT with `organizerId` = caller. Zones and seats are
+        configured afterwards in InventoryService; the poster is uploaded with `PUT /events/{eventId}/poster`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventInput'
+            example:
+              venueId: 3
+              title: Noche de Rock Nacional
+              description: Concierto con bandas invitadas.
+              category: CONCERT
+              startsAt: '2026-12-05T02:00:00Z'
+      responses:
+        '201':
+          description: Event saved ("Evento guardado").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/VenueNotFound'
+
+  /events/{eventId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    get:
+      tags: [Events]
+      operationId: getEvent
+      summary: Event detail (CU-04)
+      description: |
+        **Role:** public. DRAFT events return 404 unless the caller is the owner organizer or an
+        ADMIN. CANCELLED events return 410 for everyone except the owner and ADMIN.
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Event detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '410':
+          description: The event was cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: EVENT_CANCELLED
+                message: El evento ya no está disponible
+    put:
+      tags: [Events]
+      operationId: updateEvent
+      summary: Edit my event (CU-12)
+      description: '**Role:** ORGANIZER (owner). CANCELLED events cannot be edited.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventInput'
+      responses:
+        '200':
+          description: Event saved ("Evento guardado").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidEventState'
+    delete:
+      tags: [Events]
+      operationId: deleteEvent
+      summary: Delete my DRAFT event (CU-12)
+      description: |
+        **Role:** ORGANIZER (owner). Only DRAFT events can be deleted. A PUBLISHED event is
+        cancelled instead with `PATCH /events/{eventId}/status`.
+      responses:
+        '204':
+          description: Event deleted.
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidEventState'
+
+  /events/{eventId}/status:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    patch:
+      tags: [Events]
+      operationId: changeEventStatus
+      summary: Publish or cancel my event (CU-12)
+      description: |
+        **Role:** ORGANIZER (owner). Allowed transitions: DRAFT -> PUBLISHED, DRAFT -> CANCELLED,
+        PUBLISHED -> CANCELLED. Publishing requires at least one zone in InventoryService.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PUBLISHED, CANCELLED]
+            example:
+              status: PUBLISHED
+      responses:
+        '200':
+          description: Status updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '409':
+          description: Transition not allowed, or the event has no zones yet.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                invalidTransition:
+                  value:
+                    code: INVALID_EVENT_STATE
+                    message: No se puede cambiar el evento a ese estado
+                    details:
+                      from: CANCELLED
+                      to: PUBLISHED
+                noZones:
+                  value:
+                    code: EVENT_HAS_NO_ZONES
+                    message: Configure al menos una zona antes de publicar
+
+  /events/{eventId}/poster:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    get:
+      tags: [Events]
+      operationId: getEventPoster
+      summary: Get the event poster image
+      description: '**Role:** public (same visibility rules as `GET /events/{eventId}`). Streams the object stored in MinIO.'
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Poster image.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Event not found or it has no poster.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: POSTER_NOT_FOUND
+                message: El evento no tiene póster
+    put:
+      tags: [Events]
+      operationId: uploadEventPoster
+      summary: Upload or replace my event poster (CU-12)
+      description: '**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`.'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                contentType: image/jpeg, image/png
+      responses:
+        '200':
+          description: Poster saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: File missing.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VALIDATION_ERROR
+                message: Por favor llene todos los campos requeridos
+                details:
+                  fields:
+                    - field: file
+                      issue: required
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '413':
+          description: File larger than 5 MB.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: FILE_TOO_LARGE
+                message: La imagen no debe superar 5 MB
+        '415':
+          description: File is not JPEG or PNG.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: UNSUPPORTED_MEDIA_TYPE
+                message: Solo se permiten imágenes JPG o PNG
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+
+  /organizer/events:
+    get:
+      tags: [Events]
+      operationId: listMyEvents
+      summary: List my events in any status (CU-12)
+      description: '**Role:** ORGANIZER.'
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of the caller's events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /venues:
+    get:
+      tags: [Venues]
+      operationId: listVenues
+      summary: List venues
+      description: '**Role:** ORGANIZER, ADMIN.'
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: Text search on name.
+          schema:
+            type: string
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of venues.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenuePage'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+    post:
+      tags: [Venues]
+      operationId: createVenue
+      summary: Create a venue
+      description: '**Role:** ORGANIZER, ADMIN.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenueInput'
+            example:
+              name: Auditorio Telmex
+              address: Av. Obreros de Cananea 1500
+              city: Zapopan
+      responses:
+        '201':
+          description: Venue created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /venues/{venueId}:
+    parameters:
+      - name: venueId
+        in: path
+        required: true
+        schema:
+          $ref: './common.yaml#/components/schemas/Id'
+    get:
+      tags: [Venues]
+      operationId: getVenue
+      summary: Get a venue
+      description: '**Role:** ORGANIZER, ADMIN.'
+      responses:
+        '200':
+          description: Venue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/VenueNotFound'
+    put:
+      tags: [Venues]
+      operationId: updateVenue
+      summary: Edit a venue
+      description: '**Role:** ORGANIZER, ADMIN.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenueInput'
+      responses:
+        '200':
+          description: Venue updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/VenueNotFound'
+    delete:
+      tags: [Venues]
+      operationId: deleteVenue
+      summary: Delete a venue
+      description: '**Role:** ADMIN. Rejected if any event uses the venue.'
+      responses:
+        '204':
+          description: Venue deleted.
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/VenueNotFound'
+        '409':
+          description: The venue is used by at least one event.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: VENUE_IN_USE
+                message: El recinto tiene eventos asociados y no se puede eliminar
+
+  /events/{eventId}/staff:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    get:
+      tags: [Event staff]
+      operationId: listEventStaff
+      summary: List staff assigned to my event
+      description: '**Role:** ORGANIZER (owner).'
+      responses:
+        '200':
+          description: Assigned staff.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventStaffAssignment'
+              example:
+                - eventId: 12
+                  userId: 55
+                  assignedAt: '2026-10-26T16:30:00Z'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+
+  /events/{eventId}/staff/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [Event staff]
+      operationId: assignEventStaff
+      summary: Assign one of my staff to my event
+      description: |
+        **Role:** ORGANIZER (owner of the event). The user must have role STAFF, status ACTIVE and
+        `employerId` = caller (checked with IdentityService `GET /internal/users/{userId}`).
+        Idempotent: assigning twice returns 200.
+      responses:
+        '200':
+          description: Staff member assigned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStaffAssignment'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          description: The event is not the caller's, or the user is not the caller's staff.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                notEventOwner:
+                  value:
+                    code: NOT_EVENT_OWNER
+                    message: Solo el organizador dueño del evento puede modificarlo
+                    details:
+                      eventId: 12
+                notMyStaff:
+                  value:
+                    code: NOT_OWN_STAFF
+                    message: El usuario no pertenece a su personal
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+    delete:
+      tags: [Event staff]
+      operationId: unassignEventStaff
+      summary: Remove a staff member from my event
+      description: '**Role:** ORGANIZER (owner).'
+      responses:
+        '204':
+          description: Assignment removed.
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/NotEventOwner'
+        '404':
+          description: Event not found or the user is not assigned.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: NOT_FOUND
+                message: Recurso no encontrado
+
+  /staff/events:
+    get:
+      tags: [Event staff]
+      operationId: listMyAssignedEvents
+      summary: List the events I am assigned to
+      description: '**Role:** STAFF. Lets the scanner app pick the event to validate (CU-11).'
+      responses:
+        '200':
+          description: Events assigned to the caller that are not CANCELLED.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /admin/summary:
+    get:
+      tags: [Admin]
+      operationId: adminGlobalSummary
+      summary: Global operational summary (CU-16)
+      description: '**Role:** ADMIN. See "Why CU-16 lives here" in the API description.'
+      responses:
+        '200':
+          description: Dashboard data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSummary'
+              example:
+                generatedAt: '2026-10-26T15:30:00Z'
+                events:
+                  total: 48
+                  byStatus:
+                    DRAFT: 6
+                    PUBLISHED: 38
+                    CANCELLED: 4
+                  upcoming: 30
+                venues:
+                  total: 11
+                users:
+                  total: 1250
+                  byRole:
+                    BUYER: 1200
+                    STAFF: 35
+                    ORGANIZER: 12
+                    ADMIN: 3
+                  suspended: 8
+                sales:
+                  purchases: 3120
+                  grossRevenue: '9876500.00'
+                  currency: MXN
+                unavailableSections: []
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /internal/events/{eventId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    get:
+      tags: [Internal]
+      operationId: internalGetEvent
+      summary: Get any event regardless of status (internal)
+      description: |
+        **Internal** (service-to-service). Used by InventoryService and PurchaseService to check
+        ownership (`organizerId`) and status, and by TicketService to show event info on tickets.
+      security:
+        - internalAuth: []
+      responses:
+        '200':
+          description: Event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+
+  /internal/events:
+    get:
+      tags: [Internal]
+      operationId: internalGetEventsByIds
+      summary: Get several events by id (internal)
+      description: '**Internal** (service-to-service). Batch lookup used by TicketService for `GET /tickets/me`.'
+      security:
+        - internalAuth: []
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          style: form
+          explode: false
+          description: Comma-separated event ids (max 100).
+          schema:
+            type: array
+            maxItems: 100
+            items:
+              type: integer
+              format: int64
+          example: [12, 15]
+      responses:
+        '200':
+          description: Found events; unknown ids are omitted.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
+  /internal/events/{eventId}/staff/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Internal]
+      operationId: internalCheckStaffAssignment
+      summary: Check that a staff member is assigned to an event (internal)
+      description: '**Internal** (service-to-service). Used by TicketService before validating a ticket (CU-11).'
+      security:
+        - internalAuth: []
+      responses:
+        '200':
+          description: The user is assigned to the event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStaffAssignment'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '404':
+          description: Not assigned (or the event does not exist).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: NOT_ASSIGNED
+                message: No está asignado a este evento
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'
+    internalAuth:
+      $ref: './common.yaml#/components/securitySchemes/internalAuth'
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        $ref: './common.yaml#/components/schemas/Id'
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: './common.yaml#/components/schemas/Id'
+  responses:
+    EventNotFound:
+      description: Event not found (or DRAFT and the caller is not the owner).
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: EVENT_NOT_FOUND
+            message: El evento no existe
+    VenueNotFound:
+      description: Venue not found.
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: VENUE_NOT_FOUND
+            message: El recinto no existe
+    InvalidEventState:
+      description: The operation is not allowed in the event's current status.
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: INVALID_EVENT_STATE
+            message: El evento no se puede modificar en su estado actual
+            details:
+              status: CANCELLED
+  schemas:
+    EventStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, CANCELLED]
+    EventCategory:
+      type: string
+      description: Fixed list so clients can render filter options.
+      enum: [CONCERT, RECITAL, FESTIVAL, THEATER, SPORTS, OTHER]
+    VenueInput:
+      type: object
+      required: [name, address, city]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        address:
+          type: string
+          minLength: 1
+          maxLength: 255
+        city:
+          type: string
+          minLength: 1
+          maxLength: 120
+    Venue:
+      allOf:
+        - type: object
+          required: [id]
+          properties:
+            id:
+              $ref: './common.yaml#/components/schemas/Id'
+        - $ref: '#/components/schemas/VenueInput'
+    VenuePage:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Venue'
+    EventInput:
+      type: object
+      required: [venueId, title, description, category, startsAt]
+      properties:
+        venueId:
+          $ref: './common.yaml#/components/schemas/Id'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        category:
+          $ref: '#/components/schemas/EventCategory'
+        startsAt:
+          type: string
+          format: date-time
+          description: Must be in the future.
+    Event:
+      type: object
+      required: [id, organizerId, title, description, category, startsAt, status, venue, createdAt, updatedAt]
+      properties:
+        id:
+          $ref: './common.yaml#/components/schemas/Id'
+        organizerId:
+          $ref: './common.yaml#/components/schemas/Id'
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/EventCategory'
+        startsAt:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        posterUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Gateway URL of the poster (built from `poster_key`); null if there is no poster.
+        venue:
+          $ref: '#/components/schemas/Venue'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    EventPage:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+    EventStaffAssignment:
+      type: object
+      required: [eventId, userId, assignedAt]
+      properties:
+        eventId:
+          $ref: './common.yaml#/components/schemas/Id'
+        userId:
+          $ref: './common.yaml#/components/schemas/Id'
+        assignedAt:
+          type: string
+          format: date-time
+    AdminSummary:
+      type: object
+      required: [generatedAt, events, venues, users, sales, unavailableSections]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        events:
+          type: object
+          required: [total, byStatus, upcoming]
+          properties:
+            total:
+              type: integer
+            byStatus:
+              type: object
+              required: [DRAFT, PUBLISHED, CANCELLED]
+              properties:
+                DRAFT:
+                  type: integer
+                PUBLISHED:
+                  type: integer
+                CANCELLED:
+                  type: integer
+            upcoming:
+              type: integer
+              description: PUBLISHED events with `startsAt` in the future.
+        venues:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+        users:
+          type: object
+          nullable: true
+          description: From IdentityService `GET /internal/stats/users`. Null if that service is down.
+          allOf:
+            - $ref: './identity.yaml#/components/schemas/UserStats'
+        sales:
+          type: object
+          nullable: true
+          description: From PurchaseService `GET /internal/stats/sales`. Null if that service is down.
+          allOf:
+            - $ref: './purchase.yaml#/components/schemas/SalesStats'
+        unavailableSections:
+          type: array
+          description: Sections that could not be loaded, for example `["sales"]`.
+          items:
+            type: string
+            enum: [users, sales]

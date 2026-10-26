@@ -1,0 +1,482 @@
+openapi: 3.0.3
+info:
+  title: TicketHub TicketService
+  version: 1.0.0
+  description: |
+    Digital tickets with signed QR codes, and validation at the venue entrance.
+
+    Use cases: CU-09 (internal), CU-10, CU-11.
+
+    **QR content.** The QR encodes `signedToken`: a compact JWS (HS256 with `TICKET_SIGNING_SECRET`)
+    whose payload is `{ "tid": <ticket id>, "eid": <event id> }`. It holds no personal data.
+    The PNG is stored in MinIO; MySQL keeps only `qr_key`.
+
+    **Offline validation is out of scope.** `POST /tickets/validate` needs network access.
+
+    Roles per endpoint are listed in each operation as **Role:**.
+    Endpoints under `/internal/**` are service-to-service only; the API Gateway does not route them.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: API Gateway (clients)
+  - url: http://ticket-service:3005/api/v1
+    description: Direct service URL inside the Docker network (internal calls)
+security:
+  - bearerAuth: []
+tags:
+  - name: My tickets
+    description: The buyer's tickets (CU-10).
+  - name: Validation
+    description: Entrance validation by event staff (CU-11).
+  - name: Internal
+    description: Service-to-service endpoints. Not routed by the API Gateway.
+paths:
+  /tickets/me:
+    get:
+      tags: [My tickets]
+      operationId: listMyTickets
+      summary: List my tickets (CU-10)
+      description: |
+        **Role:** BUYER. Newest event first. Event and zone info come from CatalogService
+        and InventoryService internal lookups. An empty `items` array means "Aún no tienes boletos".
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TicketStatus'
+        - name: eventId
+          in: query
+          schema:
+            $ref: './common.yaml#/components/schemas/Id'
+        - $ref: './common.yaml#/components/parameters/Page'
+        - $ref: './common.yaml#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Page of tickets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketPage'
+              example:
+                items:
+                  - id: 3f1c9a6e-6b2d-4c8e-9a51-2f0d7c1e4b10
+                    purchaseId: 8001
+                    status: VALID
+                    usedAt: null
+                    qrImageUrl: http://localhost:8080/api/v1/tickets/3f1c9a6e-6b2d-4c8e-9a51-2f0d7c1e4b10/qr
+                    signedToken: eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOiIzZjFjOWE2ZS02YjJkLTRjOGUtOWE1MS0yZjBkN2MxZTRiMTAiLCJlaWQiOjEyfQ.c2lnbmF0dXJl
+                    event:
+                      id: 12
+                      title: Noche de Rock Nacional
+                      startsAt: '2026-12-05T02:00:00Z'
+                      venueName: Auditorio Telmex
+                      city: Zapopan
+                      status: PUBLISHED
+                    zone:
+                      id: 31
+                      name: VIP
+                      type: NUMBERED
+                    seat:
+                      id: 9002
+                      rowLabel: A
+                      seatNumber: 2
+                    issuedAt: '2026-10-26T15:45:12Z'
+                page: 1
+                pageSize: 20
+                totalItems: 1
+                totalPages: 1
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+
+  /tickets/{ticketId}:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    get:
+      tags: [My tickets]
+      operationId: getMyTicket
+      summary: Get one of my tickets (CU-10)
+      description: '**Role:** BUYER (owner).'
+      responses:
+        '200':
+          description: Ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TicketNotFound'
+
+  /tickets/{ticketId}/qr:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    get:
+      tags: [My tickets]
+      operationId: getMyTicketQr
+      summary: Get the QR image of my ticket (CU-10)
+      description: '**Role:** BUYER (owner). Streams the PNG stored in MinIO.'
+      responses:
+        '200':
+          description: QR code image.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './common.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TicketNotFound'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+
+  /tickets/validate:
+    post:
+      tags: [Validation]
+      operationId: validateTicket
+      summary: Validate a scanned QR at the entrance (CU-11)
+      description: |
+        **Role:** STAFF, and only for events the caller is assigned to (checked with CatalogService
+        `GET /internal/events/{eventId}/staff/{userId}`). On success the ticket becomes USED in
+        one atomic update (`UPDATE ... WHERE status = 'VALID'`), so two gates cannot both accept it.
+
+        Order of checks: signature -> staff assignment -> ticket belongs to `eventId` -> status.
+
+        Results: 200 `ACCESS_GRANTED` (green screen). Red screens: 422 `INVALID_SIGNATURE`,
+        403 `NOT_ASSIGNED`, 422 `WRONG_EVENT`, 409 `ALREADY_USED`, 409 `TICKET_CANCELLED`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateTicketRequest'
+            example:
+              eventId: 12
+              qrToken: eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOiIzZjFjOWE2ZS02YjJkLTRjOGUtOWE1MS0yZjBkN2MxZTRiMTAiLCJlaWQiOjEyfQ.c2lnbmF0dXJl
+      responses:
+        '200':
+          description: Access granted ("Acceso Permitido"); the ticket is now USED.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+              example:
+                result: ACCESS_GRANTED
+                message: Acceso Permitido
+                ticket:
+                  id: 3f1c9a6e-6b2d-4c8e-9a51-2f0d7c1e4b10
+                  eventId: 12
+                  zoneName: VIP
+                  rowLabel: A
+                  seatNumber: 2
+                  usedAt: '2026-12-05T01:32:08Z'
+                  validatedBy: 55
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '403':
+          description: The caller is not STAFF, or is not assigned to this event.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                notAssigned:
+                  value:
+                    code: NOT_ASSIGNED
+                    message: No está asignado a este evento
+                notStaff:
+                  value:
+                    code: FORBIDDEN
+                    message: No tiene permisos para realizar esta acción
+        '409':
+          description: The ticket was already used, or it was cancelled ("Acceso Denegado").
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                alreadyUsed:
+                  value:
+                    code: ALREADY_USED
+                    message: Acceso Denegado. El boleto ya fue usado
+                    details:
+                      ticketId: 3f1c9a6e-6b2d-4c8e-9a51-2f0d7c1e4b10
+                      usedAt: '2026-12-05T01:32:08Z'
+                cancelled:
+                  value:
+                    code: TICKET_CANCELLED
+                    message: Acceso Denegado. El boleto fue cancelado
+        '422':
+          description: The QR signature is not valid (fake ticket), or the ticket is for another event.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              examples:
+                invalidSignature:
+                  value:
+                    code: INVALID_SIGNATURE
+                    message: Boleto Inválido
+                wrongEvent:
+                  value:
+                    code: WRONG_EVENT
+                    message: Boleto Inválido. El boleto es de otro evento
+                    details:
+                      ticketEventId: 15
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
+
+  /internal/tickets/issue:
+    post:
+      tags: [Internal]
+      operationId: internalIssueTickets
+      summary: Issue the tickets of a purchase (internal, CU-09)
+      description: |
+        **Internal** (service-to-service). Called by PurchaseService after the sale is confirmed.
+        Creates one ticket per place: one per seat, and `quantity` tickets per GENERAL item.
+        Idempotent by `purchaseId`: a repeated call returns 200 with the tickets already issued,
+        so PurchaseService can retry safely.
+      security:
+        - internalAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueTicketsRequest'
+            example:
+              purchaseId: 8001
+              userId: 101
+              eventId: 12
+              items:
+                - zoneId: 31
+                  seatId: 9002
+                  quantity: 1
+                - zoneId: 32
+                  seatId: null
+                  quantity: 2
+      responses:
+        '200':
+          description: Tickets for this purchase already existed; returned unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueTicketsResponse'
+        '201':
+          description: Tickets issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueTicketsResponse'
+              example:
+                purchaseId: 8001
+                ticketIds:
+                  - 3f1c9a6e-6b2d-4c8e-9a51-2f0d7c1e4b10
+                  - 8a7e2d10-1c4f-4b9a-b3e2-77c0d9f1a5e3
+                  - c41d7f22-9e0b-4a6c-8d15-0b3e6f9a2c77
+        '400':
+          $ref: './common.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '500':
+          description: QR generation or storage failed; nothing was saved (CU-09 EX1). PurchaseService queues a retry.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: QR_GENERATION_FAILED
+                message: Error al generar el boleto digital
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './common.yaml#/components/securitySchemes/bearerAuth'
+    internalAuth:
+      $ref: './common.yaml#/components/securitySchemes/internalAuth'
+  parameters:
+    TicketId:
+      name: ticketId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    TicketNotFound:
+      description: Ticket not found.
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            code: TICKET_NOT_FOUND
+            message: El boleto no existe
+  schemas:
+    TicketStatus:
+      type: string
+      enum: [VALID, USED, CANCELLED]
+    Ticket:
+      type: object
+      required: [id, purchaseId, status, qrImageUrl, signedToken, event, zone, issuedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        purchaseId:
+          $ref: './common.yaml#/components/schemas/Id'
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        usedAt:
+          type: string
+          format: date-time
+          nullable: true
+        qrImageUrl:
+          type: string
+          format: uri
+          description: Gateway URL of the QR PNG (`GET /tickets/{ticketId}/qr`), requires the bearer token.
+        signedToken:
+          type: string
+          description: Same value encoded in the QR, so a client can draw the QR itself.
+        event:
+          type: object
+          required: [id, title, startsAt, venueName, city, status]
+          properties:
+            id:
+              $ref: './common.yaml#/components/schemas/Id'
+            title:
+              type: string
+            startsAt:
+              type: string
+              format: date-time
+            venueName:
+              type: string
+            city:
+              type: string
+            status:
+              type: string
+              enum: [DRAFT, PUBLISHED, CANCELLED]
+        zone:
+          type: object
+          required: [id, name, type]
+          properties:
+            id:
+              $ref: './common.yaml#/components/schemas/Id'
+            name:
+              type: string
+            type:
+              type: string
+              enum: [NUMBERED, GENERAL]
+        seat:
+          type: object
+          nullable: true
+          description: Null for GENERAL zones.
+          required: [id, rowLabel, seatNumber]
+          properties:
+            id:
+              $ref: './common.yaml#/components/schemas/Id'
+            rowLabel:
+              type: string
+            seatNumber:
+              type: integer
+        issuedAt:
+          type: string
+          format: date-time
+    TicketPage:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ticket'
+    ValidateTicketRequest:
+      type: object
+      required: [eventId, qrToken]
+      properties:
+        eventId:
+          $ref: './common.yaml#/components/schemas/Id'
+        qrToken:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          description: Raw text read from the QR.
+    ValidationResult:
+      type: object
+      required: [result, message, ticket]
+      properties:
+        result:
+          type: string
+          enum: [ACCESS_GRANTED]
+        message:
+          type: string
+        ticket:
+          type: object
+          required: [id, eventId, zoneName, usedAt, validatedBy]
+          properties:
+            id:
+              type: string
+              format: uuid
+            eventId:
+              $ref: './common.yaml#/components/schemas/Id'
+            zoneName:
+              type: string
+            rowLabel:
+              type: string
+              nullable: true
+            seatNumber:
+              type: integer
+              nullable: true
+            usedAt:
+              type: string
+              format: date-time
+            validatedBy:
+              $ref: './common.yaml#/components/schemas/Id'
+    IssueTicketsRequest:
+      type: object
+      required: [purchaseId, userId, eventId, items]
+      properties:
+        purchaseId:
+          $ref: './common.yaml#/components/schemas/Id'
+        userId:
+          $ref: './common.yaml#/components/schemas/Id'
+        eventId:
+          $ref: './common.yaml#/components/schemas/Id'
+        items:
+          type: array
+          minItems: 1
+          description: The `items` returned by InventoryService confirm-sale.
+          items:
+            type: object
+            required: [zoneId, quantity]
+            properties:
+              zoneId:
+                $ref: './common.yaml#/components/schemas/Id'
+              seatId:
+                type: integer
+                format: int64
+                nullable: true
+              quantity:
+                type: integer
+                minimum: 1
+    IssueTicketsResponse:
+      type: object
+      required: [purchaseId, ticketIds]
+      properties:
+        purchaseId:
+          $ref: './common.yaml#/components/schemas/Id'
+        ticketIds:
+          type: array
+          items:
+            type: string
+            format: uuid
