@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "mock:build": "node scripts/build-mock-spec.js",
     "mock:check": "node scripts/build-mock-spec.js && git diff --exit-code -- mock/",
-    "mock": "npm run mock:build && prism mock -p 4010 mock/tickethub.openapi.json"
+    "mock": "npm run mock:build && prism mock -p 4010 mock/tickethub.openapi.json",
+    "test": "docker compose exec -T identity-service npm run create-admin --silent && docker compose --profile test run --rm tests"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
