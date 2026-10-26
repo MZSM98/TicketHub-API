@@ -1,6 +1,6 @@
 import { config } from './config.js';
-import { query } from './db.js';
-import { HttpError, parseId } from './http.js';
+import { query } from '@tickethub/common/db';
+import { HttpError, parseId } from '@tickethub/common/http';
 
 export const CATEGORIES = ['CONCERT', 'RECITAL', 'FESTIVAL', 'THEATER', 'SPORTS', 'OTHER'];
 export const STATUSES = ['DRAFT', 'PUBLISHED', 'CANCELLED'];

@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { serviceUnavailable } from './http.js';
+import { serviceUnavailable } from '@tickethub/common/http';
 
 async function internalGet(service, path) {
   try {

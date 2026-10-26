@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db.js';
-import { authenticate, HttpError, notFound, parseId, requireRole } from '../http.js';
+import { query } from '@tickethub/common/db';
+import { authenticate, HttpError, notFound, parseId, requireRole } from '@tickethub/common/http';
 import { EVENT_SELECT, eventNotFound, isMissingParent, ownedEvent, toEvent } from '../events.js';
 import { getUser } from '../services.js';
 

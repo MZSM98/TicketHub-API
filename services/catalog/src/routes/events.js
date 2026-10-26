@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { query } from '../db.js';
+import { query } from '@tickethub/common/db';
 import {
   authenticate,
   HttpError,
@@ -11,7 +11,7 @@ import {
   requireRole,
   serviceUnavailable,
   validate,
-} from '../http.js';
+} from '@tickethub/common/http';
 import {
   CATEGORIES,
   EVENT_SELECT,

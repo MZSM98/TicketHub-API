@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db.js';
-import { HttpError, parseId, parseIdList, requireInternal } from '../http.js';
+import { query } from '@tickethub/common/db';
+import { HttpError, parseId, parseIdList, requireInternal } from '@tickethub/common/http';
 import { EVENT_SELECT, eventNotFound, findEventRow, toEvent } from '../events.js';
 import { findAssignment, toAssignment } from './staff.js';
 

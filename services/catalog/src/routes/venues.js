@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { query } from '../db.js';
+import { query } from '@tickethub/common/db';
 import {
   authenticate,
   HttpError,
@@ -9,7 +9,7 @@ import {
   parseQuery,
   requireRole,
   validate,
-} from '../http.js';
+} from '@tickethub/common/http';
 import { isRowReferenced, likeContains, toVenue, VENUE_COLUMNS, venueNotFound } from '../events.js';
 
 export const router = Router();

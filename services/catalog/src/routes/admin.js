@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db.js';
-import { authenticate, requireRole } from '../http.js';
+import { query } from '@tickethub/common/db';
+import { authenticate, requireRole } from '@tickethub/common/http';
 import { salesStats, userStats } from '../services.js';
 
 export const router = Router();
