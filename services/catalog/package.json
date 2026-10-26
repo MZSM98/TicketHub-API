@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@tickethub/common": "0.1.0",
-    "express": "^5.3.0"
+    "busboy": "1.6.0",
+    "express": "^5.3.0",
+    "minio": "8.0.7"
   }
 }
