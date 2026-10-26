@@ -14,10 +14,15 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "mock:build": "node scripts/build-mock-spec.js",
+    "mock:check": "node scripts/build-mock-spec.js && git diff --exit-code -- mock/",
+    "mock": "npm run mock:build && prism mock -p 4010 mock/tickethub.openapi.json"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@redocly/cli": "^2.71.1",
+    "@stoplight/prism-cli": "^5.14.2",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
