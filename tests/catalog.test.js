@@ -441,7 +441,7 @@ describe('CatalogService (catalog.yaml)', () => {
       assert.deepEqual(bad.details.fields, [{ field: 'status', issue: 'invalid_value' }]);
     });
 
-    test('DELETE /events/{id}: PUBLISHED -> 409; DRAFT -> 204 y luego 404', async () => {
+    test('DELETE /events/{id}: PUBLISHED -> 409; Inventory caído -> 503 sin borrar; DRAFT -> 204 con sus zonas', async () => {
       const token = s.orgA.token;
       const conflict = await expectContract(
         'DELETE',
@@ -451,8 +451,22 @@ describe('CatalogService (catalog.yaml)', () => {
         ev(),
       );
       assert.deepEqual(conflict.details, { status: 'PUBLISHED' });
+      fakes.zonesByEvent.set(s.draft.id, 2);
+      fakes.inventoryUp = false;
+      try {
+        const down = await expectContract('DELETE', `/events/${s.draft.id}`, 503, { token }, ev());
+        assert.equal(down.code, 'SERVICE_UNAVAILABLE');
+      } finally {
+        fakes.inventoryUp = true;
+      }
+      await expectContract('GET', `/events/${s.draft.id}`, 200, { token }, ev());
+      assert.equal(fakes.deletedZones.includes(s.draft.id), false);
+
       await expectContract('DELETE', `/events/${s.draft.id}`, 204, { token }, ev());
+      assert.equal(fakes.deletedZones.includes(s.draft.id), true);
+      assert.equal(fakes.zonesByEvent.has(s.draft.id), false);
       await expectContract('DELETE', `/events/${s.draft.id}`, 404, { token }, ev());
+      assert.equal(fakes.deletedZones.filter((id) => id === s.draft.id).length, 1);
     });
 
     test('recinto con eventos -> DELETE 409 VENUE_IN_USE', async () => {

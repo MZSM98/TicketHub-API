@@ -6,6 +6,7 @@ export const fakes = {
   sales: { purchases: 3, grossRevenue: '4500.00', currency: 'MXN' },
   salesUp: true,
   tokens: [],
+  deletedZones: [],
 };
 
 function send(res, status, body) {
@@ -19,6 +20,15 @@ export function startFakes(port, internalToken) {
     fakes.tokens.push(req.headers['x-internal-token']);
     if (req.headers['x-internal-token'] !== internalToken) {
       return send(res, 401, { code: 'UNAUTHORIZED', message: 'Token interno inválido' });
+    }
+    const zonesOfEvent = /^\/api\/v1\/internal\/events\/(\d+)\/zones$/.exec(url.pathname);
+    if (req.method === 'DELETE' && zonesOfEvent) {
+      if (!fakes.inventoryUp) return send(res, 500, { code: 'INTERNAL_ERROR', message: 'x' });
+      const eventId = Number(zonesOfEvent[1]);
+      fakes.zonesByEvent.delete(eventId);
+      fakes.deletedZones.push(eventId);
+      res.writeHead(204);
+      return res.end();
     }
     if (url.pathname === '/api/v1/internal/zones') {
       if (!fakes.inventoryUp) return send(res, 500, { code: 'INTERNAL_ERROR', message: 'x' });
