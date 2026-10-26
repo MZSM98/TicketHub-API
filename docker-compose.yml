@@ -8,7 +8,7 @@ x-db-env: &db-env
   NODE_ENV: ${NODE_ENV}
   MYSQL_HOST: ${MYSQL_HOST}
   MYSQL_PORT: ${MYSQL_PORT}
-  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN}
   JWT_SECRET: ${JWT_SECRET}
 
 x-service-urls: &service-urls
@@ -102,8 +102,8 @@ services:
       SMTP_PORT: ${SMTP_PORT}
       SMTP_SECURE: ${SMTP_SECURE}
       SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM}
+      SMTP_PASS: ${SMTP_PASS}
+      MAIL_FROM: ${MAIL_FROM}
     depends_on:
       mysql: { condition: service_healthy }
       mailpit: { condition: service_healthy }
@@ -203,6 +203,29 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks: [tickethub]
+
+  # Pruebas de integración (node:test + fetch) dentro de la red privada: npm test
+  tests:
+    image: node:20-alpine
+    profiles: [test]
+    working_dir: /app
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./mock:/app/mock:ro
+      - ./services/gateway/src:/app/services/gateway/src:ro
+    command: ['node', '--test', '--test-reporter=spec', 'tests/']
+    environment:
+      GATEWAY_URL: http://gateway:8080/api/v1
+      IDENTITY_URL: http://identity-service:3001/api/v1
+      MAILPIT_URL: http://mailpit:8025
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      gateway: { condition: service_healthy }
+      identity-service: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
     networks: [tickethub]
 
 networks:

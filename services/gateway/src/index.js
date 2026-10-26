@@ -1,12 +1,15 @@
 import http from 'node:http';
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { resolveService } from './routes.js';
+import jwt from 'jsonwebtoken';
+import { authMode, resolveService } from './routes.js';
 
 const API_PREFIX = '/api/v1';
 const port = Number(process.env.PORT ?? 8080);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) throw new Error('Falta la variable de entorno JWT_SECRET');
 // Sin respuesta del servicio en este tiempo, el gateway responde 503.
-const PROXY_TIMEOUT_MS = 10_000;
+const PROXY_TIMEOUT_MS = 15_000;
 // El timeout del agente también cubre la conexión TCP; proxyTimeout solo cuenta ya conectado.
 const proxyAgent = new http.Agent({ keepAlive: true, timeout: PROXY_TIMEOUT_MS });
 
@@ -66,9 +69,34 @@ const proxies = Object.fromEntries(
   ]),
 );
 
+/**
+ * Revisa firma y expiración del access token (common.yaml bearerAuth). Los roles y la propiedad
+ * de los recursos los revisa cada servicio; el header Authorization se reenvía sin cambios.
+ */
+function hasValidToken(req) {
+  const match = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '');
+  if (!match) return false;
+  try {
+    jwt.verify(match[1], jwtSecret, { algorithms: ['HS256'] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 app.use(API_PREFIX, (req, res, next) => {
   const service = resolveService(req.path);
   if (!service) return next();
+  const mode = authMode(req.method, req.path);
+  const tokenSent = req.get('authorization') !== undefined;
+  if ((mode === 'required' || (mode === 'optional' && tokenSent)) && !hasValidToken(req)) {
+    return sendError(
+      res,
+      401,
+      'UNAUTHORIZED',
+      'Sesión no válida o expirada, inicie sesión de nuevo',
+    );
+  }
   // Express quita el prefijo de req.url al montar; se restaura para reenviar la ruta completa.
   req.url = req.originalUrl;
   return proxies[service](req, res, next);
