@@ -1,0 +1,27 @@
+-- PurchaseService: cobros (proveedor intercambiable) e historial de compras.
+-- Contrato: contracts/purchase.yaml
+CREATE DATABASE IF NOT EXISTS tickethub_purchase CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE tickethub_purchase;
+
+-- Un renglón por reserva: un reintento tras un rechazo actualiza el mismo renglón,
+-- y reservation_id único impide cobrar dos veces la misma reserva.
+CREATE TABLE purchases (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reservation_id    BIGINT UNSIGNED NOT NULL COMMENT 'reservations.id de InventoryService',
+  user_id           BIGINT UNSIGNED NOT NULL COMMENT 'users.id de IdentityService',
+  event_id          BIGINT UNSIGNED NOT NULL COMMENT 'events.id de CatalogService (copiado de la reserva)',
+  total             DECIMAL(10, 2)  NOT NULL,
+  currency          ENUM('MXN')     NOT NULL DEFAULT 'MXN',
+  payment_provider  VARCHAR(40)     NOT NULL COMMENT 'Valor de PAYMENT_PROVIDER, p. ej. stripe',
+  payment_reference VARCHAR(255)    NULL COMMENT 'Id del cargo en el proveedor',
+  status            ENUM('PAID', 'DECLINED') NOT NULL,
+  failed_attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Máximo PAYMENT_MAX_ATTEMPTS (3)',
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_purchases_reservation (reservation_id),
+  KEY ix_purchases_user (user_id, created_at),
+  KEY ix_purchases_event (event_id, status, created_at),
+  KEY ix_purchases_reference (payment_provider, payment_reference),
+  CONSTRAINT ck_purchases_total CHECK (total >= 0)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

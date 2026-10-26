@@ -1,0 +1,198 @@
+name: tickethub
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [tickethub]
+
+x-db-env: &db-env
+  NODE_ENV: ${NODE_ENV}
+  MYSQL_HOST: ${MYSQL_HOST}
+  MYSQL_PORT: ${MYSQL_PORT}
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+  JWT_SECRET: ${JWT_SECRET}
+
+x-service-urls: &service-urls
+  IDENTITY_SERVICE_URL: http://identity-service:3001
+  CATALOG_SERVICE_URL: http://catalog-service:3002
+  INVENTORY_SERVICE_URL: http://inventory-service:3003
+  PURCHASE_SERVICE_URL: http://purchase-service:3004
+  TICKET_SERVICE_URL: http://ticket-service:3005
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ['--default-time-zone=+00:00']
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      # Los usa db/init/99-service-users.sh para crear un usuario por servicio.
+      IDENTITY_DB_USER: ${IDENTITY_DB_USER}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      CATALOG_DB_USER: ${CATALOG_DB_USER}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      INVENTORY_DB_USER: ${INVENTORY_DB_USER}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      PURCHASE_DB_USER: ${PURCHASE_DB_USER}
+      PURCHASE_DB_PASSWORD: ${PURCHASE_DB_PASSWORD}
+      TICKET_DB_USER: ${TICKET_DB_USER}
+      TICKET_DB_PASSWORD: ${TICKET_DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - '127.0.0.1:${MYSQL_HOST_PORT}:3306'
+    healthcheck:
+      # Durante la inicialización MySQL no escucha por TCP, así que esto falla hasta que termina.
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks: [tickethub]
+
+  minio:
+    # Las imágenes oficiales minio/minio ya no están en Docker Hub; esta la recompila Chainguard.
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@127.0.0.1:9000
+    volumes:
+      - minio-data:/data
+    ports:
+      - '127.0.0.1:${MINIO_CONSOLE_HOST_PORT}:9001'
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [tickethub]
+
+  mailpit:
+    image: axllent/mailpit:v1.32
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${MAILPIT_UI_HOST_PORT}:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [tickethub]
+
+  identity-service:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/identity/Dockerfile }
+    environment:
+      <<: *db-env
+      PORT: 3001
+      DB_NAME: ${IDENTITY_DB_NAME}
+      DB_USER: ${IDENTITY_DB_USER}
+      DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
+      # Solo para el script create-admin.
+      ADMIN_NAME: ${ADMIN_NAME:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+    depends_on:
+      mysql: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+
+  catalog-service:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/catalog/Dockerfile }
+    environment:
+      <<: [*db-env, *service-urls]
+      PORT: 3002
+      DB_NAME: ${CATALOG_DB_NAME}
+      DB_USER: ${CATALOG_DB_USER}
+      DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
+    depends_on:
+      mysql: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  inventory-service:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/inventory/Dockerfile }
+    environment:
+      <<: [*db-env, *service-urls]
+      PORT: 3003
+      DB_NAME: ${INVENTORY_DB_NAME}
+      DB_USER: ${INVENTORY_DB_USER}
+      DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES}
+      MAX_TICKETS_PER_RESERVATION: ${MAX_TICKETS_PER_RESERVATION}
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  purchase-service:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/purchase/Dockerfile }
+    environment:
+      <<: [*db-env, *service-urls]
+      PORT: 3004
+      DB_NAME: ${PURCHASE_DB_NAME}
+      DB_USER: ${PURCHASE_DB_USER}
+      DB_PASSWORD: ${PURCHASE_DB_PASSWORD}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER}
+      PAYMENT_MAX_ATTEMPTS: ${PAYMENT_MAX_ATTEMPTS}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  ticket-service:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/ticket/Dockerfile }
+    environment:
+      <<: [*db-env, *service-urls]
+      PORT: 3005
+      DB_NAME: ${TICKET_DB_NAME}
+      DB_USER: ${TICKET_DB_USER}
+      DB_PASSWORD: ${TICKET_DB_PASSWORD}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      TICKET_SIGNING_SECRET: ${TICKET_SIGNING_SECRET}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_QR: ${MINIO_BUCKET_QR}
+    depends_on:
+      mysql: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  gateway:
+    <<: *service-defaults
+    build: { context: ., dockerfile: services/gateway/Dockerfile }
+    environment:
+      <<: *service-urls
+      NODE_ENV: ${NODE_ENV}
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - '${GATEWAY_HOST_PORT}:8080'
+    # Sin depends_on de salud: si un servicio cae, el gateway sigue y responde 503 solo en sus rutas.
+    depends_on:
+      [identity-service, catalog-service, inventory-service, purchase-service, ticket-service]
+
+networks:
+  tickethub:
+    name: tickethub
+    driver: bridge
+
+volumes:
+  mysql-data:
+  minio-data:
