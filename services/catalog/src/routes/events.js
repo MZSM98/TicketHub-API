@@ -27,7 +27,7 @@ import {
   venueNotFound,
   visibleEvent,
 } from '../events.js';
-import { countZones } from '../services.js';
+import { countZones, deleteZones } from '../services.js';
 
 export const router = Router();
 const organizer = [authenticate, requireRole('ORGANIZER')];
@@ -170,6 +170,7 @@ router.put('/events/:eventId', ...organizer, async (req, res) => {
 router.delete('/events/:eventId', ...organizer, async (req, res) => {
   const event = await ownedEvent(req);
   if (event.status !== 'DRAFT') throw invalidEventState(event.status);
+  await deleteZones(event.id);
   const result = await query("DELETE FROM events WHERE id = ? AND status = 'DRAFT'", [event.id]);
   if (result.affectedRows === 0) {
     const current = await findEventRow(event.id);

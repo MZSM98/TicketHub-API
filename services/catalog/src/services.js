@@ -1,9 +1,10 @@
 import { config } from './config.js';
 import { serviceUnavailable } from '@tickethub/common/http';
 
-async function internalGet(service, path) {
+async function internalRequest(service, path, method = 'GET') {
   try {
     const res = await fetch(`${config.services[service]}/api/v1${path}`, {
+      method,
       headers: { 'x-internal-token': config.internalToken },
       signal: AbortSignal.timeout(config.internalTimeoutMs),
     });
@@ -20,15 +21,20 @@ async function internalGet(service, path) {
   }
 }
 
+export async function deleteZones(eventId) {
+  const result = await internalRequest('inventory', `/internal/events/${eventId}/zones`, 'DELETE');
+  if (result?.status !== 204) throw serviceUnavailable();
+}
+
 export async function getUser(userId) {
-  const result = await internalGet('identity', `/internal/users/${userId}`);
+  const result = await internalRequest('identity', `/internal/users/${userId}`);
   if (result?.status === 404) return null;
   if (result?.status !== 200 || typeof result.body?.id !== 'number') throw serviceUnavailable();
   return result.body;
 }
 
 export async function countZones(eventId) {
-  const result = await internalGet('inventory', `/internal/zones?eventId=${eventId}`);
+  const result = await internalRequest('inventory', `/internal/zones?eventId=${eventId}`);
   if (result?.status !== 200 || !Array.isArray(result.body)) throw serviceUnavailable();
   return result.body.length;
 }
@@ -36,7 +42,7 @@ export async function countZones(eventId) {
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 
 export async function userStats() {
-  const result = await internalGet('identity', '/internal/stats/users');
+  const result = await internalRequest('identity', '/internal/stats/users');
   const body = result?.status === 200 ? result.body : null;
   const roles = ['BUYER', 'STAFF', 'ORGANIZER', 'ADMIN'];
   if (
@@ -54,7 +60,7 @@ export async function userStats() {
 }
 
 export async function salesStats() {
-  const result = await internalGet('purchase', '/internal/stats/sales');
+  const result = await internalRequest('purchase', '/internal/stats/sales');
   const body = result?.status === 200 ? result.body : null;
   if (
     !isCount(body?.purchases) ||
