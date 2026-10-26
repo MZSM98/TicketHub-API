@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { query } from '@tickethub/common/db';
+import { randomUUID } from 'node:crypto';
+import { query, transaction } from '@tickethub/common/db';
 import {
   authenticate,
   HttpError,
@@ -28,6 +29,8 @@ import {
   visibleEvent,
 } from '../events.js';
 import { countZones, deleteZones } from '../services.js';
+import { getObject, putObject, removeObject } from '../storage.js';
+import { readPoster } from '../upload.js';
 
 export const router = Router();
 const organizer = [authenticate, requireRole('ORGANIZER')];
@@ -177,6 +180,7 @@ router.delete('/events/:eventId', ...organizer, async (req, res) => {
     if (!current) throw eventNotFound();
     throw invalidEventState(current.status);
   }
+  if (event.poster_key) await removeObject(event.poster_key);
   res.status(204).end();
 });
 
@@ -207,15 +211,51 @@ router.patch('/events/:eventId/status', ...organizer, async (req, res) => {
   res.json(toEvent(current));
 });
 
-router.get('/events/:eventId/poster', optionalAuth, async (req, _res) => {
+const posterNotFound = () => new HttpError(404, 'POSTER_NOT_FOUND', 'El evento no tiene póster');
+
+router.get('/events/:eventId/poster', optionalAuth, async (req, res) => {
   const event = await visibleEvent(req);
-  if (!event.poster_key) {
-    throw new HttpError(404, 'POSTER_NOT_FOUND', 'El evento no tiene póster');
+  if (!event.poster_key) throw posterNotFound();
+  let poster;
+  try {
+    poster = await getObject(event.poster_key);
+  } catch {
+    throw serviceUnavailable();
   }
-  throw serviceUnavailable();
+  if (!poster) throw posterNotFound();
+  res.set({
+    'Content-Type': poster.contentType ?? 'application/octet-stream',
+    'Content-Length': String(poster.size),
+  });
+  poster.stream.on('error', () => res.destroy());
+  poster.stream.pipe(res);
 });
 
-router.put('/events/:eventId/poster', ...organizer, async (req, _res) => {
-  await ownedEvent(req);
-  throw serviceUnavailable();
+router.put('/events/:eventId/poster', ...organizer, async (req, res) => {
+  const event = await ownedEvent(req);
+  const poster = await readPoster(req);
+  const key = `events/${event.id}/${randomUUID()}.${poster.extension}`;
+  try {
+    await putObject(key, poster.buffer, poster.contentType);
+  } catch {
+    throw serviceUnavailable();
+  }
+  let previousKey;
+  try {
+    previousKey = await transaction(async (conn) => {
+      const [row] = await query(
+        'SELECT poster_key FROM events WHERE id = ? FOR UPDATE',
+        [event.id],
+        conn,
+      );
+      if (!row) throw eventNotFound();
+      await query('UPDATE events SET poster_key = ? WHERE id = ?', [key, event.id], conn);
+      return row.poster_key;
+    });
+  } catch (err) {
+    await removeObject(key);
+    throw err;
+  }
+  if (previousKey) await removeObject(previousKey);
+  res.json(toEvent(await findEventRow(event.id)));
 });
