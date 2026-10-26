@@ -18,19 +18,34 @@ export const forbidden = () =>
   new HttpError(403, 'FORBIDDEN', 'No tiene permisos para realizar esta acción');
 export const notFound = () => new HttpError(404, 'NOT_FOUND', 'Recurso no encontrado');
 
-function validationError(fields) {
+function validationError(fields, customMessage) {
   const onlyMissing = fields.every((f) => f.issue === 'required');
   const message = onlyMissing
     ? 'Por favor llene todos los campos requeridos'
-    : 'Algunos datos no son válidos, revise los campos marcados';
+    : (customMessage ?? 'Algunos datos no son válidos, revise los campos marcados');
   return new HttpError(400, 'VALIDATION_ERROR', message, { fields });
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Password de identity.yaml: 8 a 72 caracteres y máximo 72 bytes UTF-8 (límite de bcrypt). */
+export const NEW_PASSWORD_RULE = {
+  type: 'string',
+  required: true,
+  minLength: 8,
+  maxLength: 72,
+  maxBytes: 72,
+  messages: {
+    too_short: 'La contraseña debe tener al menos 8 caracteres',
+    too_long:
+      'La contraseña no puede pasar de 72 bytes; los acentos y la ñ cuentan como 2, use una más corta',
+  },
+};
+
 /**
- * Valida `source` contra `rules` ({ campo: { type, required, minLength, maxLength, format, enum } })
- * y regresa solo los campos conocidos. Lanza 400 VALIDATION_ERROR con todos los campos inválidos.
+ * Valida `source` contra `rules` ({ campo: { type, required, minLength, maxLength, maxBytes,
+ * format, enum, messages } }) y regresa solo los campos conocidos. Lanza 400 VALIDATION_ERROR con
+ * todos los campos inválidos; `messages[issue]` da un mensaje más claro para ese problema.
  */
 export function validate(source, rules) {
   if (source === null || typeof source !== 'object' || Array.isArray(source)) {
@@ -48,7 +63,12 @@ export function validate(source, rules) {
     if (issue) fields.push({ field, issue });
     else values[field] = rule.trim ? raw.trim() : raw;
   }
-  if (fields.length > 0) throw validationError(fields);
+  if (fields.length > 0) {
+    // Mensaje específico solo cuando el problema es uno, para no ocultar los demás.
+    const custom =
+      fields.length === 1 ? rules[fields[0].field]?.messages?.[fields[0].issue] : undefined;
+    throw validationError(fields, custom);
+  }
   return values;
 }
 
@@ -58,6 +78,7 @@ function checkValue(raw, rule) {
     const value = rule.trim ? raw.trim() : raw;
     if (rule.minLength && value.length < rule.minLength) return 'too_short';
     if (rule.maxLength && value.length > rule.maxLength) return 'too_long';
+    if (rule.maxBytes && Buffer.byteLength(value, 'utf8') > rule.maxBytes) return 'too_long';
     if (rule.format === 'email' && !EMAIL_RE.test(value)) return 'invalid_format';
     if (rule.enum && !rule.enum.includes(value)) return 'invalid_value';
   }

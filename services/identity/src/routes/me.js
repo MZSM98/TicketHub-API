@@ -2,7 +2,7 @@
 import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { query, transaction } from '../db.js';
-import { authenticate, HttpError, unauthorized, validate } from '../http.js';
+import { authenticate, HttpError, NEW_PASSWORD_RULE, unauthorized, validate } from '../http.js';
 import { hashToken, revokeAllRefreshTokens } from '../tokens.js';
 import { findUserById, hashPassword, toUser } from '../users.js';
 
@@ -22,7 +22,7 @@ router.get('/users/me', authenticate, async (req, res) => {
 router.put('/users/me/password', authenticate, async (req, res) => {
   const body = validate(req.body, {
     currentPassword: { type: 'string', required: true },
-    newPassword: { type: 'string', required: true, minLength: 8, maxLength: 72 },
+    newPassword: NEW_PASSWORD_RULE,
     refreshToken: { type: 'string', minLength: 1, maxLength: 512 },
   });
   const user = await currentUser(req);

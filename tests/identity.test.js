@@ -131,6 +131,26 @@ describe('IdentityService (identity.yaml)', () => {
     }
   });
 
+  test('contraseña de 72 bytes UTF-8 como máximo: <= 72 caracteres pero > 72 bytes -> 400', async () => {
+    const tooLong = 'ñ'.repeat(40); // 40 caracteres, 80 bytes
+    const err = await expectContract('POST', '/auth/register', 400, {
+      body: { name: 'Ñandú', email: email('bytes'), password: tooLong },
+    });
+    assert.deepEqual(err.details.fields, [{ field: 'password', issue: 'too_long' }]);
+    assert.match(err.message, /72 bytes/);
+
+    const change = await expectContract('PUT', '/users/me/password', 400, {
+      token: state.buyerSession.accessToken,
+      body: { currentPassword: buyer.password, newPassword: tooLong },
+    });
+    assert.deepEqual(change.details.fields, [{ field: 'newPassword', issue: 'too_long' }]);
+
+    // Justo en el límite: 36 'á' = 72 bytes -> se acepta y funciona para iniciar sesión.
+    const exact = { name: 'Límite', email: email('bytes72'), password: 'á'.repeat(36) };
+    await expectContract('POST', '/auth/register', 201, { body: exact });
+    await login(exact.email, exact.password);
+  });
+
   test('GET /users/me con token -> 200 User', async () => {
     const me = await expectContract('GET', '/users/me', 200, {
       token: state.buyerSession.accessToken,
@@ -223,11 +243,15 @@ describe('IdentityService (identity.yaml)', () => {
     assert.ok(admins.items.every((u) => u.role === 'ADMIN'));
     assert.equal(admins.pageSize, 5);
 
-    const bad = await call('GET', '/admin/users?pageSize=500&role=X', {
-      token: state.admin.accessToken,
-    });
-    assert.equal(bad.res.status, 400);
-    assertSchema(responseSchema('POST', '/api/v1/auth/register', 400), bad.body, '400');
+    const bad = await expectContract(
+      'GET',
+      '/admin/users?pageSize=500&role=X',
+      400,
+      { token: state.admin.accessToken },
+      '/admin/users',
+    );
+    assert.equal(bad.code, 'VALIDATION_ERROR');
+    assert.deepEqual(bad.details.fields.map((f) => f.field).sort(), ['pageSize', 'role']);
   });
 
   test('admin: suspender -> login 403 y refresh 403; reactivar -> login 200', async () => {
@@ -347,6 +371,14 @@ describe('IdentityService (identity.yaml)', () => {
       [staff.email],
     );
     await expectContract('GET', '/organizer/staff', 403, { token: state.admin.accessToken });
+    const bad = await expectContract(
+      'GET',
+      '/organizer/staff?status=BORRADO',
+      400,
+      { token },
+      '/organizer/staff',
+    );
+    assert.deepEqual(bad.details.fields, [{ field: 'status', issue: 'invalid_value' }]);
     await expectContract('POST', '/organizer/staff', 409, { token, body: staff });
 
     // El organizador cambia su contraseña temporal: mustChangePassword pasa a false.

@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { config } from '../config.js';
 import { query, transaction } from '../db.js';
-import { HttpError, validate } from '../http.js';
+import { HttpError, NEW_PASSWORD_RULE, validate } from '../http.js';
 import { hashToken, issueTokenPair } from '../tokens.js';
 import { hashPassword, insertUser, toUser, USER_COLUMNS } from '../users.js';
 
@@ -12,7 +12,6 @@ export const router = Router();
 
 const NAME = { type: 'string', required: true, trim: true, minLength: 1, maxLength: 120 };
 const EMAIL = { type: 'string', required: true, trim: true, maxLength: 255, format: 'email' };
-const NEW_PASSWORD = { type: 'string', required: true, minLength: 8, maxLength: 72 };
 const REFRESH_TOKEN = { type: 'string', required: true, minLength: 1, maxLength: 512 };
 
 const invalidCredentials = () =>
@@ -26,7 +25,7 @@ const invalidRefreshToken = () =>
 const DUMMY_HASH = bcrypt.hashSync(randomBytes(16).toString('hex'), config.bcryptRounds);
 
 router.post('/auth/register', async (req, res) => {
-  const body = validate(req.body, { name: NAME, email: EMAIL, password: NEW_PASSWORD });
+  const body = validate(req.body, { name: NAME, email: EMAIL, password: NEW_PASSWORD_RULE });
   const user = await insertUser({
     name: body.name,
     email: body.email.toLowerCase(),
