@@ -113,7 +113,7 @@ npm test   # crea el admin de .env si no existe y corre tests/ en el contenedor 
 
 Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
 
-CatalogService depende de dos servicios que aún no existen: InventoryService (publicar un evento requiere al menos una zona, `GET /internal/zones?eventId=`) y PurchaseService (ventas del resumen CU-16, `GET /internal/stats/sales`). Para probarlo, `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a un Inventory y un Purchase falsos que levanta la suite (`tests/fakes.js`), y al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras esos servicios no estén implementados, publicar un evento responde 503 y el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
+CatalogService depende de dos servicios que aún no existen: InventoryService (publicar un evento requiere al menos una zona, `GET /internal/zones?eventId=`, y borrar un evento DRAFT borra antes sus zonas, `DELETE /internal/events/{eventId}/zones`) y PurchaseService (ventas del resumen CU-16, `GET /internal/stats/sales`). Para probarlo, `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a un Inventory y un Purchase falsos que levanta la suite (`tests/fakes.js`), y al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras esos servicios no estén implementados, publicar o borrar un evento responde 503 y el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
 
 ## CatalogService
 
@@ -122,7 +122,12 @@ Recintos, eventos, personal asignado a eventos y el resumen global (CU-03, CU-04
 - Recintos sin dueño: ORGANIZER y ADMIN los crean y editan; solo ADMIN los borra, y no si algún evento los usa (409 `VENUE_IN_USE`, lo garantiza la llave foránea).
 - Eventos: solo ORGANIZER crea; se crean en DRAFT con el organizador del token. Editar, borrar, cambiar estado, el póster y el personal son solo del organizador dueño (403 `NOT_EVENT_OWNER`). Transiciones: DRAFT -> PUBLISHED, DRAFT -> CANCELLED y PUBLISHED -> CANCELLED.
 - Personal: el organizador solo asigna usuarios STAFF activos con `employerId` igual a él (se consulta IdentityService); asignar dos veces responde 200.
-- Póster: **pendiente**. Subirlo responde 503 y `GET /events/{eventId}/poster` responde 404 `POSTER_NOT_FOUND`, porque falta aprobar un cliente S3 y un parser de `multipart/form-data`.
+- Borrar un evento DRAFT borra primero sus zonas en InventoryService. Si Inventory no responde, el evento no se borra y la respuesta es 503, para no dejar zonas sin evento; se puede reintentar.
+- Póster: JPG o PNG de hasta 5 MB en `multipart/form-data` (campo `file`). El tipo se revisa por los primeros bytes del archivo, no por el nombre. Se guarda en MinIO, en el bucket `MINIO_BUCKET_POSTERS` (se crea si no existe), y MySQL guarda solo `poster_key`. Al reemplazarlo o borrar el evento se borra el archivo anterior. `GET /events/{eventId}/poster` sigue las mismas reglas de visibilidad que el evento.
+
+## Código compartido
+
+`services/common` (`@tickethub/common`) tiene lo que comparten los servicios: errores con el formato de `common.yaml`, validación, autenticación (`JWT_SECRET`, `INTERNAL_TOKEN`) en `@tickethub/common/http`, y el pool de MySQL (`MYSQL_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`) en `@tickethub/common/db`. Los Dockerfile de cada servicio copian este paquete junto con el suyo.
 
 ## Calidad de código
 
