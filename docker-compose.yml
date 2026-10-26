@@ -214,10 +214,12 @@ services:
       - ./tests:/app/tests:ro
       - ./mock:/app/mock:ro
       - ./services/gateway/src:/app/services/gateway/src:ro
-    command: ['node', '--test', '--test-reporter=spec', 'tests/']
+    command: ['node', '--test', '--test-concurrency=1', '--test-reporter=spec', 'tests/']
     environment:
       GATEWAY_URL: http://gateway:8080/api/v1
       IDENTITY_URL: http://identity-service:3001/api/v1
+      CATALOG_URL: http://catalog-service:3002/api/v1
+      FAKES_PORT: 4100
       MAILPIT_URL: http://mailpit:8025
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
@@ -225,6 +227,7 @@ services:
     depends_on:
       gateway: { condition: service_healthy }
       identity-service: { condition: service_healthy }
+      catalog-service: { condition: service_healthy }
       mailpit: { condition: service_healthy }
     networks: [tickethub]
 
