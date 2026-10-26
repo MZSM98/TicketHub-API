@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { assertSchema, responseSchema } from './contract.js';
+import { assertContract, assertSchema, responseSchema } from './contract.js';
 import { fakes, startFakes } from './fakes.js';
 import {
   ADMIN_EMAIL,
@@ -11,6 +11,7 @@ import {
   createStaff,
   email,
   expectContract,
+  GATEWAY,
   IDENTITY,
   INTERNAL_TOKEN,
   login,
@@ -21,6 +22,29 @@ const ERROR_SCHEMA = responseSchema('POST', '/api/v1/events', 400);
 const EVENT_SCHEMA = responseSchema('GET', '/api/v1/events/{eventId}', 200);
 const ASSIGNMENT_SCHEMA = responseSchema('PUT', '/api/v1/events/{eventId}/staff/{userId}', 200);
 const internal = { 'x-internal-token': INTERNAL_TOKEN };
+
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 1)]);
+
+function form(fields) {
+  const data = new FormData();
+  for (const [name, value] of Object.entries(fields)) {
+    if (value instanceof Blob) data.append(name, value, `${name}.bin`);
+    else data.append(name, value);
+  }
+  return data;
+}
+
+async function upload(path, token, body) {
+  const headers = { authorization: `Bearer ${token}` };
+  if (typeof body === 'string') headers['content-type'] = 'application/json';
+  const res = await fetch(`${GATEWAY}${path}`, { method: 'PUT', headers, body });
+  const text = await res.text();
+  return { res, body: text ? JSON.parse(text) : null };
+}
 
 const inDays = (days) =>
   new Date(Date.now() + days * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -482,7 +506,7 @@ describe('CatalogService (catalog.yaml)', () => {
       assert.equal(err.code, 'VENUE_IN_USE');
     });
 
-    test('póster: sin póster -> 404 POSTER_NOT_FOUND; subirlo queda pendiente (503)', async () => {
+    test('póster: sin póster -> 404 POSTER_NOT_FOUND; archivo faltante 400, no imagen 415, > 5 MB 413', async () => {
       const got = await expectContract(
         'GET',
         `/events/${s.event.id}/poster`,
@@ -491,17 +515,76 @@ describe('CatalogService (catalog.yaml)', () => {
         ev('/poster'),
       );
       assert.equal(got.code, 'POSTER_NOT_FOUND');
-      await expectContract('GET', `/events/${s.draft.id}/poster`, 404, {}, ev('/poster'));
-      const upload = await expectContract(
-        'PUT',
-        `/events/${s.event.id}/poster`,
-        503,
-        {
-          token: s.orgA.token,
-        },
-        ev('/poster'),
+      const path = `/events/${s.event.id}/poster`;
+      const token = s.orgA.token;
+      const cases = [
+        [form({ otro: 'x' }), 400, 'VALIDATION_ERROR'],
+        [JSON.stringify({ file: 'x' }), 400, 'VALIDATION_ERROR'],
+        [form({ file: new Blob(['hola'], { type: 'image/png' }) }), 415, 'UNSUPPORTED_MEDIA_TYPE'],
+        [
+          form({ file: new Blob([PNG, Buffer.alloc(5 * 1024 * 1024)], { type: 'image/png' }) }),
+          413,
+          'FILE_TOO_LARGE',
+        ],
+      ];
+      for (const [body, status, code] of cases) {
+        const { res, body: err } = await upload(path, token, body);
+        assertContract(res, err, 'PUT', `/api/v1${ev('/poster')}`, status);
+        assert.equal(err.code, code);
+      }
+      const { body: missing } = await upload(path, token, form({ otro: 'x' }));
+      assert.deepEqual(missing.details.fields, [{ field: 'file', issue: 'required' }]);
+    });
+
+    test('póster: el dueño sube PNG y lo reemplaza por JPG; se descarga por el gateway desde MinIO', async () => {
+      const path = `/events/${s.event.id}/poster`;
+      const token = s.orgA.token;
+      const first = await upload(
+        path,
+        token,
+        form({ file: new Blob([PNG], { type: 'image/png' }) }),
       );
-      assert.equal(upload.code, 'SERVICE_UNAVAILABLE');
+      assertContract(first.res, first.body, 'PUT', `/api/v1${ev('/poster')}`, 200);
+      assert.ok(first.body.posterUrl.endsWith(`/events/${s.event.id}/poster`));
+      let download = await fetch(`${GATEWAY}${path}`);
+      assert.equal(download.status, 200);
+      assert.equal(download.headers.get('content-type'), 'image/png');
+      assert.deepEqual(Buffer.from(await download.arrayBuffer()), PNG);
+
+      const second = await upload(
+        path,
+        token,
+        form({ file: new Blob([JPEG], { type: 'image/jpeg' }) }),
+      );
+      assertContract(second.res, second.body, 'PUT', `/api/v1${ev('/poster')}`, 200);
+      download = await fetch(`${GATEWAY}${path}`);
+      assert.equal(download.headers.get('content-type'), 'image/jpeg');
+      assert.deepEqual(Buffer.from(await download.arrayBuffer()), JPEG);
+
+      const listed = await expectContract('GET', `/events?q=${RUN}`, 200, {}, '/events');
+      assert.equal(listed.items.find((e) => e.id === s.event.id).posterUrl, second.body.posterUrl);
+      s.event = second.body;
+    });
+
+    test('póster de un DRAFT: el dueño lo ve, el público recibe 404', async () => {
+      const draft = await expectContract('POST', '/events', 201, {
+        token: s.orgA.token,
+        body: { ...input(), title: `Con póster ${RUN}` },
+      });
+      const path = `/events/${draft.id}/poster`;
+      const up = await upload(
+        path,
+        s.orgA.token,
+        form({ file: new Blob([PNG], { type: 'image/png' }) }),
+      );
+      assert.equal(up.res.status, 200);
+      const anon = await expectContract('GET', path, 404, {}, ev('/poster'));
+      assert.equal(anon.code, 'EVENT_NOT_FOUND');
+      const owner = await fetch(`${GATEWAY}${path}`, {
+        headers: { authorization: `Bearer ${s.orgA.token}` },
+      });
+      assert.equal(owner.status, 200);
+      await expectContract('DELETE', `/events/${draft.id}`, 204, { token: s.orgA.token }, ev());
     });
   });
 
@@ -637,6 +720,8 @@ describe('CatalogService (catalog.yaml)', () => {
         const err = await expectContract('GET', path, 410, { token: auth }, ev());
         assert.equal(err.code, 'EVENT_CANCELLED');
       }
+      const poster = await call('GET', `${path}/poster`);
+      assertError(poster.res, poster.body, 410, 'EVENT_CANCELLED');
       await expectContract('GET', path, 200, { token }, ev());
       await expectContract('GET', path, 200, { token: s.admin }, ev());
       const edit = await expectContract(
