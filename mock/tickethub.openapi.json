@@ -5649,7 +5649,7 @@
         ],
         "operationId": "uploadEventPoster",
         "summary": "Upload or replace my event poster (CU-12)",
-        "description": "**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`.",
+        "description": "**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`. CANCELLED events cannot get a new poster.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5987,6 +5987,52 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation is not allowed in the event's current status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "INVALID_EVENT_STATE",
+                  "message": "El evento no se puede modificar en su estado actual",
+                  "details": {
+                    "status": "CANCELLED"
+                  }
                 }
               }
             }

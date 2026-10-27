@@ -373,7 +373,7 @@ paths:
       tags: [Events]
       operationId: uploadEventPoster
       summary: Upload or replace my event poster (CU-12)
-      description: '**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`.'
+      description: '**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`. CANCELLED events cannot get a new poster.'
       requestBody:
         required: true
         content:
@@ -414,6 +414,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidEventState'
         '413':
           description: File larger than 5 MB.
           content:
