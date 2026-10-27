@@ -702,7 +702,7 @@ describe('CatalogService (catalog.yaml)', () => {
   });
 
   describe('Cancelación', () => {
-    test('PATCH CANCELLED -> 200; luego 410 para el público, 409 al editar o republicar', async () => {
+    test('PATCH CANCELLED -> 200; luego 410 para el público, 409 al editar, republicar o subir póster', async () => {
       const token = s.orgA.token;
       const path = `/events/${s.event.id}`;
       const cancelled = await expectContract(
@@ -722,6 +722,18 @@ describe('CatalogService (catalog.yaml)', () => {
       }
       const poster = await expectContract('GET', `${path}/poster`, 410, {}, ev('/poster'));
       assert.equal(poster.code, 'EVENT_CANCELLED');
+      const blocked = await upload(
+        `${path}/poster`,
+        token,
+        form({ file: new Blob([PNG], { type: 'image/png' }) }),
+      );
+      assertContract(blocked.res, blocked.body, 'PUT', `/api/v1${ev('/poster')}`, 409);
+      assert.deepEqual(blocked.body.details, { status: 'CANCELLED' });
+      const ownerPoster = await fetch(`${GATEWAY}${path}/poster`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assert.equal(ownerPoster.status, 200);
+      assert.deepEqual(Buffer.from(await ownerPoster.arrayBuffer()), JPEG);
       await expectContract('GET', path, 200, { token }, ev());
       await expectContract('GET', path, 200, { token: s.admin }, ev());
       const edit = await expectContract(
