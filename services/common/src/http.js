@@ -1,7 +1,9 @@
-// Errores con el formato de common.yaml (Error) y validación manual según los límites del contrato.
 import { timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { config } from './config.js';
+import { requiredEnv } from './env.js';
+
+const jwtSecret = requiredEnv('JWT_SECRET');
+const internalToken = requiredEnv('INTERNAL_TOKEN');
 
 export class HttpError extends Error {
   constructor(status, code, message, details) {
@@ -17,6 +19,8 @@ export const unauthorized = () =>
 export const forbidden = () =>
   new HttpError(403, 'FORBIDDEN', 'No tiene permisos para realizar esta acción');
 export const notFound = () => new HttpError(404, 'NOT_FOUND', 'Recurso no encontrado');
+export const serviceUnavailable = () =>
+  new HttpError(503, 'SERVICE_UNAVAILABLE', 'Servicio temporalmente inactivo');
 
 function validationError(fields, customMessage) {
   const onlyMissing = fields.every((f) => f.issue === 'required');
@@ -27,26 +31,14 @@ function validationError(fields, customMessage) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/i;
 
-/** Password de identity.yaml: 8 a 72 caracteres y máximo 72 bytes UTF-8 (límite de bcrypt). */
-export const NEW_PASSWORD_RULE = {
-  type: 'string',
-  required: true,
-  minLength: 8,
-  maxLength: 72,
-  maxBytes: 72,
-  messages: {
-    too_short: 'La contraseña debe tener al menos 8 caracteres',
-    too_long:
-      'La contraseña no puede pasar de 72 bytes; los acentos y la ñ cuentan como 2, use una más corta',
-  },
-};
+export function parseDateTime(value) {
+  if (typeof value !== 'string' || !DATE_TIME_RE.test(value)) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
-/**
- * Valida `source` contra `rules` ({ campo: { type, required, minLength, maxLength, maxBytes,
- * format, enum, messages } }) y regresa solo los campos conocidos. Lanza 400 VALIDATION_ERROR con
- * todos los campos inválidos; `messages[issue]` da un mensaje más claro para ese problema.
- */
 export function validate(source, rules) {
   if (source === null || typeof source !== 'object' || Array.isArray(source)) {
     throw validationError([{ field: 'body', issue: 'required' }]);
@@ -59,12 +51,11 @@ export function validate(source, rules) {
       if (rule.required) fields.push({ field, issue: 'required' });
       continue;
     }
-    const issue = checkValue(raw, rule);
-    if (issue) fields.push({ field, issue });
-    else values[field] = rule.trim ? raw.trim() : raw;
+    const result = checkValue(raw, rule);
+    if (result.issue) fields.push({ field, issue: result.issue });
+    else values[field] = result.value;
   }
   if (fields.length > 0) {
-    // Mensaje específico solo cuando el problema es uno, para no ocultar los demás.
     const custom =
       fields.length === 1 ? rules[fields[0].field]?.messages?.[fields[0].issue] : undefined;
     throw validationError(fields, custom);
@@ -73,19 +64,35 @@ export function validate(source, rules) {
 }
 
 function checkValue(raw, rule) {
-  if (rule.type === 'string') {
-    if (typeof raw !== 'string') return 'invalid_type';
-    const value = rule.trim ? raw.trim() : raw;
-    if (rule.minLength && value.length < rule.minLength) return 'too_short';
-    if (rule.maxLength && value.length > rule.maxLength) return 'too_long';
-    if (rule.maxBytes && Buffer.byteLength(value, 'utf8') > rule.maxBytes) return 'too_long';
-    if (rule.format === 'email' && !EMAIL_RE.test(value)) return 'invalid_format';
-    if (rule.enum && !rule.enum.includes(value)) return 'invalid_value';
+  switch (rule.type) {
+    case 'string': {
+      if (typeof raw !== 'string') return { issue: 'invalid_type' };
+      const value = rule.trim ? raw.trim() : raw;
+      if (rule.minLength && value.length < rule.minLength) return { issue: 'too_short' };
+      if (rule.maxLength && value.length > rule.maxLength) return { issue: 'too_long' };
+      if (rule.maxBytes && Buffer.byteLength(value, 'utf8') > rule.maxBytes) {
+        return { issue: 'too_long' };
+      }
+      if (rule.format === 'email' && !EMAIL_RE.test(value)) return { issue: 'invalid_format' };
+      if (rule.enum && !rule.enum.includes(value)) return { issue: 'invalid_value' };
+      return { value };
+    }
+    case 'id':
+      if (typeof raw !== 'number') return { issue: 'invalid_type' };
+      if (!Number.isSafeInteger(raw) || raw < 1) return { issue: 'invalid_value' };
+      return { value: raw };
+    case 'date-time': {
+      if (typeof raw !== 'string') return { issue: 'invalid_type' };
+      const date = parseDateTime(raw);
+      if (!date) return { issue: 'invalid_format' };
+      if (rule.future && date.getTime() <= Date.now()) return { issue: 'not_in_future' };
+      return { value: date };
+    }
+    default:
+      return { value: raw };
   }
-  return null;
 }
 
-/** Valida y convierte query params de paginación y filtros (page, pageSize, enums, booleanos). */
 export function parseQuery(query, rules) {
   const values = {};
   const fields = [];
@@ -105,6 +112,10 @@ export function parseQuery(query, rules) {
     } else if (rule.type === 'boolean') {
       if (raw !== 'true' && raw !== 'false') fields.push({ field, issue: 'invalid_value' });
       else values[field] = raw === 'true';
+    } else if (rule.type === 'date-time') {
+      const date = parseDateTime(raw);
+      if (!date) fields.push({ field, issue: 'invalid_format' });
+      else values[field] = date;
     } else if (rule.enum && !rule.enum.includes(raw)) {
       fields.push({ field, issue: 'invalid_value' });
     } else values[field] = raw;
@@ -113,24 +124,42 @@ export function parseQuery(query, rules) {
   return values;
 }
 
+const ID_RULE = { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER };
+export const QUERY_ID_RULE = ID_RULE;
+
 export const PAGE_RULES = {
-  page: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER, default: 1 },
+  page: { ...ID_RULE, default: 1 },
   pageSize: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
 };
 
-/** Id de ruta (common.yaml Id: entero >= 1). Un id mal formado se trata como inexistente. */
-export function parseId(raw) {
-  if (!/^\d{1,18}$/.test(raw) || Number(raw) < 1) throw notFound();
+export function parseIdList(raw, field, max) {
+  if (raw === undefined || raw === '') throw validationError([{ field, issue: 'required' }]);
+  if (typeof raw !== 'string') throw validationError([{ field, issue: 'invalid_type' }]);
+  const parts = raw.split(',');
+  if (parts.length > max) throw validationError([{ field, issue: 'too_many' }]);
+  if (!parts.every((p) => /^\d{1,15}$/.test(p) && Number(p) >= 1)) {
+    throw validationError([{ field, issue: 'invalid_value' }]);
+  }
+  return [...new Set(parts.map(Number))];
+}
+
+export function pageOf(items, total, { page, pageSize }) {
+  return { items, page, pageSize, totalItems: total, totalPages: Math.ceil(total / pageSize) };
+}
+
+export function parseId(raw, error = notFound) {
+  if (!/^\d{1,15}$/.test(raw) || Number(raw) < 1) throw error();
   return Number(raw);
 }
 
-/** Verifica el access token (HS256, JWT_SECRET) y deja { userId, role, employerId } en req.auth. */
-export function authenticate(req, _res, next) {
-  const match = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '');
+function readToken(req) {
+  const header = req.get('authorization');
+  if (header === undefined) return null;
+  const match = /^Bearer (.+)$/i.exec(header);
   if (!match) throw unauthorized();
   try {
-    const payload = jwt.verify(match[1], config.jwtSecret, { algorithms: ['HS256'] });
-    req.auth = {
+    const payload = jwt.verify(match[1], jwtSecret, { algorithms: ['HS256'] });
+    return {
       userId: Number(payload.sub),
       role: payload.role,
       employerId: payload.employerId ?? null,
@@ -138,6 +167,16 @@ export function authenticate(req, _res, next) {
   } catch {
     throw unauthorized();
   }
+}
+
+export function authenticate(req, _res, next) {
+  req.auth = readToken(req);
+  if (!req.auth) throw unauthorized();
+  next();
+}
+
+export function optionalAuth(req, _res, next) {
+  req.auth = readToken(req);
   next();
 }
 
@@ -148,10 +187,9 @@ export const requireRole =
     next();
   };
 
-/** /internal/**: header X-Internal-Token igual a INTERNAL_TOKEN. */
 export function requireInternal(req, _res, next) {
   const sent = Buffer.from(req.get('x-internal-token') ?? '');
-  const expected = Buffer.from(config.internalToken);
+  const expected = Buffer.from(internalToken);
   if (sent.length !== expected.length || !timingSafeEqual(sent, expected)) throw unauthorized();
   next();
 }

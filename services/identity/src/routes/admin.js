@@ -1,6 +1,6 @@
 // /admin/**: administración de cuentas (CU-14) y alta de organizadores (CU-15). Rol ADMIN.
 import { Router } from 'express';
-import { query, transaction } from '../db.js';
+import { query, transaction } from '@tickethub/common/db';
 import {
   authenticate,
   HttpError,
@@ -10,7 +10,7 @@ import {
   parseQuery,
   requireRole,
   validate,
-} from '../http.js';
+} from '@tickethub/common/http';
 import { sendCredentialsEmail } from '../mail.js';
 import { revokeAllRefreshTokens } from '../tokens.js';
 import {

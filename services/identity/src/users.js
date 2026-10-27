@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { config } from './config.js';
-import { query } from './db.js';
-import { HttpError } from './http.js';
+import { query } from '@tickethub/common/db';
+import { HttpError } from '@tickethub/common/http';
 
 export const USER_COLUMNS =
   'id, name, email, role, status, organization_name, employer_id, must_change_password, created_at, updated_at, deleted_at';

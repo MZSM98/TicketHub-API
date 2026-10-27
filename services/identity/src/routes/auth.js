@@ -3,8 +3,9 @@ import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { config } from '../config.js';
-import { query, transaction } from '../db.js';
-import { HttpError, NEW_PASSWORD_RULE, validate } from '../http.js';
+import { query, transaction } from '@tickethub/common/db';
+import { HttpError, validate } from '@tickethub/common/http';
+import { NEW_PASSWORD_RULE } from '../passwords.js';
 import { hashToken, issueTokenPair } from '../tokens.js';
 import { hashPassword, insertUser, toUser, USER_COLUMNS } from '../users.js';
 

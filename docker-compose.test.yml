@@ -1,0 +1,5 @@
+services:
+  catalog-service:
+    environment:
+      INVENTORY_SERVICE_URL: http://tests:4100
+      PURCHASE_SERVICE_URL: http://tests:4100

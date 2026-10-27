@@ -59,7 +59,7 @@ Para que las apps móvil y de escritorio avancen sin esperar la implementación,
 
 ```bash
 docker compose --profile mock up mock     # con Docker, sin Node
-npm install && npm run mock               # con Node 20, regenera el archivo y arranca Prism
+npm install && npm run mock               # con Node 20 o 24, regenera el archivo y arranca Prism
 ```
 
 - URL base: `http://localhost:4010/api/v1`, por ejemplo `GET http://localhost:4010/api/v1/events`.
@@ -112,6 +112,30 @@ npm test   # crea el admin de .env si no existe y corre tests/ en el contenedor 
 ```
 
 Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
+
+CatalogService depende de dos servicios que aún no existen: InventoryService (publicar un evento requiere al menos una zona, `GET /internal/zones?eventId=`, y borrar un evento DRAFT borra antes sus zonas, `DELETE /internal/events/{eventId}/zones`) y PurchaseService (ventas del resumen CU-16, `GET /internal/stats/sales`). Para probarlo, `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a un Inventory y un Purchase falsos que levanta la suite (`tests/fakes.js`), y al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras esos servicios no estén implementados, publicar o borrar un evento responde 503 y el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
+
+## CatalogService
+
+Recintos, eventos, personal asignado a eventos y el resumen global (CU-03, CU-04, CU-12, CU-16), según `contracts/catalog.yaml`:
+
+- Recintos sin dueño: ORGANIZER y ADMIN los crean y editan; solo ADMIN los borra, y no si algún evento los usa (409 `VENUE_IN_USE`, lo garantiza la llave foránea).
+- Eventos: solo ORGANIZER crea; se crean en DRAFT con el organizador del token. Editar, borrar, cambiar estado, el póster y el personal son solo del organizador dueño (403 `NOT_EVENT_OWNER`). Transiciones: DRAFT -> PUBLISHED, DRAFT -> CANCELLED y PUBLISHED -> CANCELLED.
+- Personal: el organizador solo asigna usuarios STAFF activos con `employerId` igual a él (se consulta IdentityService); asignar dos veces responde 200.
+- Borrar un evento DRAFT borra primero sus zonas en InventoryService. Si Inventory no responde, el evento no se borra y la respuesta es 503, para no dejar zonas sin evento; se puede reintentar.
+- Póster: JPG o PNG de hasta 5 MB en `multipart/form-data` (campo `file`). El tipo se revisa por los primeros bytes del archivo, no por el nombre. Se guarda en MinIO, en el bucket `MINIO_BUCKET_POSTERS`, y MySQL guarda solo `poster_key`. Al reemplazarlo o borrar el evento se borra el archivo anterior. Un evento CANCELLED no acepta póster nuevo (409 `INVALID_EVENT_STATE`). `GET /events/{eventId}/poster` sigue las mismas reglas de visibilidad que el evento (404 DRAFT, 410 CANCELLED) y responde 503 si MinIO no responde.
+
+## MinIO
+
+Cada servicio entra a MinIO con su propio usuario, limitado a su bucket: CatalogService (`CATALOG_MINIO_ACCESS_KEY`, `CATALOG_MINIO_SECRET_KEY`) solo a `MINIO_BUCKET_POSTERS` y TicketService (`TICKET_MINIO_ACCESS_KEY`, `TICKET_MINIO_SECRET_KEY`) solo a `MINIO_BUCKET_QR`. Ninguno puede ver otros buckets, crear o borrar buckets, ni usar la administración. El usuario root (`MINIO_ROOT_USER`) solo lo usa el contenedor `minio-init`, que al levantar el stack crea los buckets, las políticas y los usuarios (`minio/init.sh`). Se puede volver a ejecutar sin problema, por ejemplo después de cambiar una contraseña en `.env`:
+
+```bash
+docker compose run --rm minio-init
+```
+
+## Código compartido
+
+`services/common` (`@tickethub/common`) tiene lo que comparten los servicios: errores con el formato de `common.yaml`, validación, autenticación (`JWT_SECRET`, `INTERNAL_TOKEN`) en `@tickethub/common/http`, y el pool de MySQL (`MYSQL_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`) en `@tickethub/common/db`. Los Dockerfile de cada servicio copian este paquete junto con el suyo.
 
 ## Calidad de código
 

@@ -3,62 +3,20 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { authMode } from '../services/gateway/src/routes.js';
-import { assertContract, assertSchema, contractSecurity, responseSchema } from './contract.js';
-
-const GATEWAY = process.env.GATEWAY_URL ?? 'http://localhost:8080/api/v1';
-const IDENTITY = process.env.IDENTITY_URL ?? 'http://identity-service:3001/api/v1';
-const MAILPIT = process.env.MAILPIT_URL ?? 'http://mailpit:8025';
-const { INTERNAL_TOKEN, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
-
-const RUN = Date.now().toString(36);
-const email = (who) => `${who}-${RUN}@example.com`;
-
-async function call(method, path, { body, token, headers = {}, base = GATEWAY } = {}) {
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  return { res, body: text ? JSON.parse(text) : null };
-}
-
-/** Llama por el gateway y valida status + cuerpo contra el contrato (template = ruta del contrato). */
-async function expectContract(method, path, status, options = {}, template = path) {
-  const { res, body } = await call(method, path, options);
-  assertContract(res, body, method, `/api/v1${template}`, status);
-  return body;
-}
-
-function jwtPayload(token) {
-  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-}
-
-async function findEmail(to) {
-  for (let i = 0; i < 20; i++) {
-    const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
-    const { messages = [] } = await res.json();
-    if (messages.length > 0) return messages[0];
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error(`No llegó correo a ${to}`);
-}
-
-/** Contraseña temporal del correo de credenciales (no se imprime). */
-async function temporaryPasswordFrom(message) {
-  const res = await fetch(`${MAILPIT}/api/v1/message/${message.ID}`);
-  const { Text } = await res.json();
-  const match = /Contraseña temporal: (\S+)/.exec(Text);
-  assert.ok(match, 'El correo no trae la contraseña temporal');
-  return match[1];
-}
-
-const login = (mail, password) =>
-  expectContract('POST', '/auth/login', 200, { body: { email: mail, password } });
+import { assertSchema, contractSecurity, responseSchema } from './contract.js';
+import {
+  ADMIN_EMAIL,
+  ADMIN_PASSWORD,
+  call,
+  email,
+  expectContract,
+  findEmail,
+  IDENTITY,
+  INTERNAL_TOKEN,
+  jwtPayload,
+  login,
+  temporaryPasswordFrom,
+} from './helpers.js';
 
 describe('Gateway: seguridad por ruta', () => {
   test('la tabla de rutas públicas del gateway coincide con security de los contratos', () => {

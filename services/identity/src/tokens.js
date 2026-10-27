@@ -2,7 +2,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { config } from './config.js';
-import { query } from './db.js';
+import { query } from '@tickethub/common/db';
 
 export const hashToken = (token) => createHash('sha256').update(token).digest('hex');
 

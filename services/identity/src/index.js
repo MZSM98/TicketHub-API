@@ -1,6 +1,6 @@
 import express from 'express';
 import { config } from './config.js';
-import { errorHandler, notFound } from './http.js';
+import { errorHandler, notFound } from '@tickethub/common/http';
 import { router as adminRouter } from './routes/admin.js';
 import { router as authRouter } from './routes/auth.js';
 import { router as internalRouter } from './routes/internal.js';

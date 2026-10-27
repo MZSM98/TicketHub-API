@@ -4641,7 +4641,7 @@
             }
           },
           "404": {
-            "description": "Event not found (or DRAFT and the caller is not the owner).",
+            "description": "The event does not exist, or `venueId` is not an existing venue.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4676,9 +4676,19 @@
                     }
                   }
                 },
-                "example": {
-                  "code": "EVENT_NOT_FOUND",
-                  "message": "El evento no existe"
+                "examples": {
+                  "eventNotFound": {
+                    "value": {
+                      "code": "EVENT_NOT_FOUND",
+                      "message": "El evento no existe"
+                    }
+                  },
+                  "venueNotFound": {
+                    "value": {
+                      "code": "VENUE_NOT_FOUND",
+                      "message": "El recinto no existe"
+                    }
+                  }
                 }
               }
             }
@@ -4742,7 +4752,7 @@
         ],
         "operationId": "deleteEvent",
         "summary": "Delete my DRAFT event (CU-12)",
-        "description": "**Role:** ORGANIZER (owner). Only DRAFT events can be deleted. A PUBLISHED event is\ncancelled instead with `PATCH /events/{eventId}/status`.\n",
+        "description": "**Role:** ORGANIZER (owner). Only DRAFT events can be deleted. A PUBLISHED event is\ncancelled instead with `PATCH /events/{eventId}/status`.\nIts zones are deleted first in InventoryService (`DELETE /internal/events/{eventId}/zones`).\nIf InventoryService does not answer, the event is not deleted and the answer is 503, so\nno zones are left without an event; the request can be retried.\n",
         "responses": {
           "204": {
             "description": "Event deleted."
@@ -4931,6 +4941,49 @@
                   "details": {
                     "status": "CANCELLED"
                   }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "InventoryService did not answer; the event was not deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }
@@ -5362,6 +5415,49 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "InventoryService did not answer, so the zones could not be checked before publishing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5458,6 +5554,92 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "The event was cancelled (for everyone except the owner and ADMIN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "EVENT_CANCELLED",
+                  "message": "El evento ya no está disponible"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "MinIO did not answer, so the poster could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
+                }
+              }
+            }
           }
         }
       },
@@ -5467,7 +5649,7 @@
         ],
         "operationId": "uploadEventPoster",
         "summary": "Upload or replace my event poster (CU-12)",
-        "description": "**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`.",
+        "description": "**Role:** ORGANIZER (owner). JPEG or PNG, max 5 MB. Stored in MinIO; MySQL keeps only `poster_key`. CANCELLED events cannot get a new poster.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5805,6 +5987,52 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation is not allowed in the event's current status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "INVALID_EVENT_STATE",
+                  "message": "El evento no se puede modificar en su estado actual",
+                  "details": {
+                    "status": "CANCELLED"
+                  }
                 }
               }
             }
@@ -6155,6 +6383,57 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid query parameter (`status`, `page` or `pageSize`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Algunos datos no son válidos, revise los campos marcados",
+                  "details": {
+                    "fields": [
+                      {
+                        "field": "status",
+                        "issue": "invalid_value"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing, invalid or expired token.",
             "content": {
@@ -6384,6 +6663,57 @@
                       }
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameter (`page` or `pageSize`, for example `pageSize` above 100).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Algunos datos no son válidos, revise los campos marcados",
+                  "details": {
+                    "fields": [
+                      {
+                        "field": "pageSize",
+                        "issue": "invalid_value"
+                      }
+                    ]
+                  }
                 }
               }
             }

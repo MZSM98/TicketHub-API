@@ -70,6 +70,26 @@ services:
       retries: 20
     networks: [tickethub]
 
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest
+    restart: 'no'
+    entrypoint: ['sh', '/init/init.sh']
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
+      MINIO_BUCKET_QR: ${MINIO_BUCKET_QR}
+      CATALOG_MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
+      CATALOG_MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
+      TICKET_MINIO_ACCESS_KEY: ${TICKET_MINIO_ACCESS_KEY}
+      TICKET_MINIO_SECRET_KEY: ${TICKET_MINIO_SECRET_KEY}
+    volumes:
+      - ./minio/init.sh:/init/init.sh:ro
+    depends_on:
+      minio: { condition: service_healthy }
+    networks: [tickethub]
+
   mailpit:
     image: axllent/mailpit:v1.32
     restart: unless-stopped
@@ -119,12 +139,12 @@ services:
       DB_PASSWORD: ${CATALOG_DB_PASSWORD}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
       MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
     depends_on:
       mysql: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
 
   inventory-service:
     <<: *service-defaults
@@ -167,12 +187,12 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       TICKET_SIGNING_SECRET: ${TICKET_SIGNING_SECRET}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${TICKET_MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${TICKET_MINIO_SECRET_KEY}
       MINIO_BUCKET_QR: ${MINIO_BUCKET_QR}
     depends_on:
       mysql: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
 
   gateway:
     <<: *service-defaults
@@ -214,10 +234,12 @@ services:
       - ./tests:/app/tests:ro
       - ./mock:/app/mock:ro
       - ./services/gateway/src:/app/services/gateway/src:ro
-    command: ['node', '--test', '--test-reporter=spec', 'tests/']
+    command: ['node', '--test', '--test-concurrency=1', '--test-reporter=spec', 'tests/']
     environment:
       GATEWAY_URL: http://gateway:8080/api/v1
       IDENTITY_URL: http://identity-service:3001/api/v1
+      CATALOG_URL: http://catalog-service:3002/api/v1
+      FAKES_PORT: 4100
       MAILPIT_URL: http://mailpit:8025
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
@@ -225,6 +247,7 @@ services:
     depends_on:
       gateway: { condition: service_healthy }
       identity-service: { condition: service_healthy }
+      catalog-service: { condition: service_healthy }
       mailpit: { condition: service_healthy }
     networks: [tickethub]
 

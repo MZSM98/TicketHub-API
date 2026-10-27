@@ -1,20 +1,16 @@
-// /internal/**: solo entre servicios (X-Internal-Token). El gateway no las enruta.
 import { Router } from 'express';
-import { query } from '../db.js';
-import { notFound, parseId, requireInternal } from '../http.js';
+import { query } from '@tickethub/common/db';
+import { notFound, parseId, requireInternal } from '@tickethub/common/http';
 import { findUserById, toUser } from '../users.js';
 
 export const router = Router();
-router.use('/internal', requireInternal);
-
-router.get('/internal/users/:userId', async (req, res) => {
+router.get('/internal/users/:userId', requireInternal, async (req, res) => {
   const user = await findUserById(parseId(req.params.userId));
   if (!user) throw notFound();
-  // También regresa cuentas borradas, con deletedAt.
   res.json(toUser(user, { withDeletedAt: true }));
 });
 
-router.get('/internal/stats/users', async (_req, res) => {
+router.get('/internal/stats/users', requireInternal, async (_req, res) => {
   const rows = await query(
     `SELECT role, COUNT(*) AS total, SUM(status = 'SUSPENDED') AS suspended
      FROM users WHERE deleted_at IS NULL GROUP BY role`,
