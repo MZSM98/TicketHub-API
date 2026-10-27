@@ -13,9 +13,10 @@ service_user() {
   bucket_policy "$bucket" > "/tmp/$name.json"
   mc admin policy create local "$name-bucket" "/tmp/$name.json"
   mc admin user add local "$access_key" "$secret_key"
-  if ! mc admin user info local "$access_key" | grep -q "$name-bucket"; then
-    mc admin policy attach local "$name-bucket" --user "$access_key"
-  fi
+  case "$(mc admin user info local "$access_key")" in
+    *"$name-bucket"*) ;;
+    *) mc admin policy attach local "$name-bucket" --user "$access_key" ;;
+  esac
   echo "MinIO: usuario $access_key con acceso solo a $bucket"
 }
 
