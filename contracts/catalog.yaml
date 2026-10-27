@@ -351,6 +351,24 @@ paths:
               example:
                 code: POSTER_NOT_FOUND
                 message: El evento no tiene póster
+        '410':
+          description: The event was cancelled (for everyone except the owner and ADMIN).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: EVENT_CANCELLED
+                message: El evento ya no está disponible
+        '503':
+          description: MinIO did not answer, so the poster could not be read.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: SERVICE_UNAVAILABLE
+                message: Servicio temporalmente inactivo
     put:
       tags: [Events]
       operationId: uploadEventPoster

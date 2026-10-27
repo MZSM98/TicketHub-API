@@ -5554,6 +5554,92 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "The event was cancelled (for everyone except the owner and ADMIN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "EVENT_CANCELLED",
+                  "message": "El evento ya no está disponible"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "MinIO did not answer, so the poster could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
+                }
+              }
+            }
           }
         }
       },
