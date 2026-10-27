@@ -233,6 +233,7 @@ router.get('/events/:eventId/poster', optionalAuth, async (req, res) => {
 
 router.put('/events/:eventId/poster', ...organizer, async (req, res) => {
   const event = await ownedEvent(req);
+  if (event.status === 'CANCELLED') throw invalidEventState(event.status);
   const poster = await readPoster(req);
   const key = `events/${event.id}/${randomUUID()}.${poster.extension}`;
   try {
@@ -244,11 +245,12 @@ router.put('/events/:eventId/poster', ...organizer, async (req, res) => {
   try {
     previousKey = await transaction(async (conn) => {
       const [row] = await query(
-        'SELECT poster_key FROM events WHERE id = ? FOR UPDATE',
+        'SELECT poster_key, status FROM events WHERE id = ? FOR UPDATE',
         [event.id],
         conn,
       );
       if (!row) throw eventNotFound();
+      if (row.status === 'CANCELLED') throw invalidEventState(row.status);
       await query('UPDATE events SET poster_key = ? WHERE id = ?', [key, event.id], conn);
       return row.poster_key;
     });
