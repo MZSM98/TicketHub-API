@@ -720,8 +720,8 @@ describe('CatalogService (catalog.yaml)', () => {
         const err = await expectContract('GET', path, 410, { token: auth }, ev());
         assert.equal(err.code, 'EVENT_CANCELLED');
       }
-      const poster = await call('GET', `${path}/poster`);
-      assertError(poster.res, poster.body, 410, 'EVENT_CANCELLED');
+      const poster = await expectContract('GET', `${path}/poster`, 410, {}, ev('/poster'));
+      assert.equal(poster.code, 'EVENT_CANCELLED');
       await expectContract('GET', path, 200, { token }, ev());
       await expectContract('GET', path, 200, { token: s.admin }, ev());
       const edit = await expectContract(
