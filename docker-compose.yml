@@ -70,6 +70,26 @@ services:
       retries: 20
     networks: [tickethub]
 
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest
+    restart: 'no'
+    entrypoint: ['sh', '/init/init.sh']
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
+      MINIO_BUCKET_QR: ${MINIO_BUCKET_QR}
+      CATALOG_MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
+      CATALOG_MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
+      TICKET_MINIO_ACCESS_KEY: ${TICKET_MINIO_ACCESS_KEY}
+      TICKET_MINIO_SECRET_KEY: ${TICKET_MINIO_SECRET_KEY}
+    volumes:
+      - ./minio/init.sh:/init/init.sh:ro
+    depends_on:
+      minio: { condition: service_healthy }
+    networks: [tickethub]
+
   mailpit:
     image: axllent/mailpit:v1.32
     restart: unless-stopped
