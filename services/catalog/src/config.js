@@ -11,8 +11,8 @@ export const config = {
   internalTimeoutMs: Number(process.env.INTERNAL_TIMEOUT_MS ?? 3000),
   minio: {
     endpoint: required('MINIO_ENDPOINT'),
-    accessKey: required('MINIO_ROOT_USER'),
-    secretKey: required('MINIO_ROOT_PASSWORD'),
+    accessKey: required('MINIO_ACCESS_KEY'),
+    secretKey: required('MINIO_SECRET_KEY'),
     bucket: required('MINIO_BUCKET_POSTERS'),
   },
   services: {

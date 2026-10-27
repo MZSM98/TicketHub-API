@@ -139,12 +139,12 @@ services:
       DB_PASSWORD: ${CATALOG_DB_PASSWORD}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
       MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
     depends_on:
       mysql: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
 
   inventory-service:
     <<: *service-defaults
