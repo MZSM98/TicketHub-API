@@ -309,7 +309,7 @@ export async function createReservation(userId, eventId, items) {
           );
           if (updated.affectedRows === 0) {
             const [zone] = await query(
-              'SELECT capacity - reserved_count - sold_count AS available FROM zones WHERE id = ?',
+              'SELECT capacity - reserved_count - sold_count AS available FROM zones WHERE id = ? FOR UPDATE',
               [zoneId],
               conn,
             );
