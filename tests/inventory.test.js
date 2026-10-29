@@ -21,6 +21,16 @@ import {
 const BUYERS = 50;
 const internal = { 'x-internal-token': INTERNAL_TOKEN };
 const RESERVATION_SCHEMA = responseSchema('GET', '/api/v1/reservations/{reservationId}', 200);
+const INTERNAL_RESERVATION_SCHEMA = {
+  allOf: [
+    RESERVATION_SCHEMA,
+    {
+      type: 'object',
+      required: ['purchaseId'],
+      properties: { purchaseId: { type: 'integer', minimum: 1, nullable: true } },
+    },
+  ],
+};
 const ZONES_SCHEMA = responseSchema('GET', '/api/v1/events/{eventId}/zones', 200);
 const ERROR_SCHEMA = responseSchema('POST', '/api/v1/reservations', 409);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -725,8 +735,8 @@ describe('InventoryService (inventory.yaml)', () => {
 
     test('confirm-sale: vende asientos, idempotente con la misma compra, 409 con otra', async () => {
       const path = `/internal/reservations/${s.resB.id}`;
-      const got = await expectInternal('GET', path, 200, RESERVATION_SCHEMA);
-      assert.equal(got.status, 'ACTIVE');
+      const got = await expectInternal('GET', path, 200, INTERNAL_RESERVATION_SCHEMA);
+      assert.deepEqual([got.status, got.purchaseId], ['ACTIVE', null]);
       const invalid = await expectInternal('POST', `${path}/confirm-sale`, 400, ERROR_SCHEMA, {
         body: { purchaseId: 'x' },
       });
@@ -746,6 +756,16 @@ describe('InventoryService (inventory.yaml)', () => {
         body: { purchaseId },
       });
       assert.equal(repeat.status, 'CONFIRMED');
+      const confirmedView = await expectInternal('GET', path, 200, INTERNAL_RESERVATION_SCHEMA);
+      assert.deepEqual([confirmedView.status, confirmedView.purchaseId], ['CONFIRMED', purchaseId]);
+      const publicView = await expectContract(
+        'GET',
+        `/reservations/${s.resB.id}`,
+        200,
+        { token: s.buyers[1] },
+        '/reservations/{reservationId}',
+      );
+      assert.equal('purchaseId' in publicView, false, 'el cliente no ve purchaseId');
       const other = await expectInternal('POST', `${path}/confirm-sale`, 409, ERROR_SCHEMA, {
         body: { purchaseId: purchaseId + 1 },
       });
@@ -966,7 +986,7 @@ describe('InventoryService (inventory.yaml)', () => {
         'GET',
         `/internal/reservations/${created.body.id}`,
         200,
-        RESERVATION_SCHEMA,
+        INTERNAL_RESERVATION_SCHEMA,
       );
       assert.equal(got.status, 'EXPIRED');
     });
