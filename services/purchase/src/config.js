@@ -25,6 +25,7 @@ export const config = {
   paymentProvider: process.env.PAYMENT_PROVIDER ?? 'stripe',
   paymentMaxAttempts: atLeastOne('PAYMENT_MAX_ATTEMPTS', 3),
   ticketRetryMs: positiveNumber('TICKET_RETRY_SECONDS', 30) * 1000,
+  ticketRetryBackoffSeconds: positiveNumber('TICKET_RETRY_BACKOFF_SECONDS', 30),
   ticketRetryMaxSeconds: positiveNumber('TICKET_RETRY_MAX_SECONDS', 3600),
   ticketRetryBatch: atLeastOne('TICKET_RETRY_BATCH', 50),
   paymentSweepMs: positiveNumber('PAYMENT_SWEEP_SECONDS', 60) * 1000,

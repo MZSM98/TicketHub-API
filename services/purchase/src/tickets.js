@@ -22,15 +22,13 @@ async function payloadOf(purchaseId) {
   };
 }
 
-const baseSeconds = () => Math.max(1, config.ticketRetryMs / 1000 || 30);
-
 async function scheduleRetry(purchaseId) {
   await query(
     `UPDATE purchases
         SET ticket_attempts = ticket_attempts + 1,
             ticket_next_retry_at = DATE_ADD(NOW(3), INTERVAL LEAST(? * POW(2, ticket_attempts), ?) SECOND)
       WHERE id = ? AND ticket_issuance = 'PENDING'`,
-    [baseSeconds(), config.ticketRetryMaxSeconds, purchaseId],
+    [config.ticketRetryBackoffSeconds, config.ticketRetryMaxSeconds, purchaseId],
   );
 }
 
