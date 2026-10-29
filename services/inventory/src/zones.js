@@ -66,9 +66,9 @@ export async function ownedZone(req) {
   return { zone, event };
 }
 
-export async function visibleEvent(eventId) {
+export async function visibleEvent(eventId, hidden = eventNotFound) {
   const event = await getEvent(eventId);
-  if (!event || event.status === 'DRAFT') throw eventNotFound();
+  if (!event || event.status === 'DRAFT') throw hidden();
   if (event.status === 'CANCELLED' || new Date(event.startsAt).getTime() <= Date.now()) {
     throw eventNotAvailable();
   }

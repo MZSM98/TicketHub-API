@@ -131,6 +131,7 @@ router.delete('/zones/:zoneId', ...organizer, async (req, res) => {
 router.get('/zones/:zoneId/seats', async (req, res) => {
   const zone = await findZone(parseId(req.params.zoneId, zoneNotFound));
   if (!zone) throw zoneNotFound();
+  await visibleEvent(zone.event_id, zoneNotFound);
   if (zone.type !== 'NUMBERED') throw zoneNotNumbered();
   await expireDue();
   res.json(await seatMap(zone));
