@@ -93,7 +93,10 @@ paths:
       summary: Seat map of a NUMBERED zone (CU-05)
       description: |
         **Role:** public. Clients draw RESERVED and SOLD seats as not selectable. For a GENERAL zone
-        the API returns 409 `ZONE_NOT_NUMBERED`.
+        the API returns 409 `ZONE_NOT_NUMBERED`. Same visibility as the event availability (checked
+        with CatalogService): a zone of a DRAFT event answers 404 `ZONE_NOT_FOUND`, a zone of a
+        CANCELLED or already started event answers 410 `EVENT_NOT_AVAILABLE`, and 503 when
+        CatalogService is not reachable.
       security: []
       responses:
         '200':
@@ -124,6 +127,10 @@ paths:
           $ref: '#/components/responses/ZoneNotFound'
         '409':
           $ref: '#/components/responses/ZoneNotNumbered'
+        '410':
+          $ref: '#/components/responses/EventNotAvailable'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
     post:
       tags: [Zones]
       operationId: generateZoneSeats
