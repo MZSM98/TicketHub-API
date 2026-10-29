@@ -25,3 +25,18 @@ CREATE TABLE purchases (
   KEY ix_purchases_reference (payment_provider, payment_reference),
   CONSTRAINT ck_purchases_total CHECK (total >= 0)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE purchase_items (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  purchase_id BIGINT UNSIGNED NOT NULL,
+  zone_id     BIGINT UNSIGNED NOT NULL,
+  seat_id     BIGINT UNSIGNED NULL,
+  quantity    INT UNSIGNED    NOT NULL,
+  unit_price  DECIMAL(10, 2)  NOT NULL,
+  PRIMARY KEY (id),
+  KEY ix_purchase_items_purchase (purchase_id),
+  KEY ix_purchase_items_zone (zone_id),
+  CONSTRAINT fk_purchase_items_purchase FOREIGN KEY (purchase_id) REFERENCES purchases (id),
+  CONSTRAINT ck_purchase_items_quantity CHECK (quantity > 0),
+  CONSTRAINT ck_purchase_items_price CHECK (unit_price >= 0)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

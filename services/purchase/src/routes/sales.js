@@ -31,6 +31,14 @@ router.get('/events/:eventId/sales', authenticate, requireRole('ORGANIZER'), asy
         GROUP BY day ORDER BY day`,
     [eventId],
   );
+  const zoneRevenue = await query(
+    `SELECT pi.zone_id AS zoneId, SUM(pi.unit_price * pi.quantity) AS revenue
+       FROM purchase_items pi JOIN purchases p ON p.id = pi.purchase_id
+      WHERE p.event_id = ? AND p.status = 'PAID'
+      GROUP BY pi.zone_id`,
+    [eventId],
+  );
+  const revenueOf = new Map(zoneRevenue.map((row) => [row.zoneId, toCents(row.revenue)]));
   const ticketsSold = zones.reduce((sum, zone) => sum + zone.soldCount, 0);
   const capacity = zones.reduce((sum, zone) => sum + zone.capacity, 0);
   res.json({
@@ -48,7 +56,7 @@ router.get('/events/:eventId/sales', authenticate, requireRole('ORGANIZER'), asy
       capacity: zone.capacity,
       sold: zone.soldCount,
       reserved: zone.reservedCount,
-      revenue: fromCents(toCents(zone.price) * zone.soldCount),
+      revenue: fromCents(revenueOf.get(zone.id) ?? 0),
     })),
     byDay: days.map((day) => ({
       date: day.day,

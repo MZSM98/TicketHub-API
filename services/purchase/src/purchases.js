@@ -104,6 +104,16 @@ function saleFailure(status) {
   return serviceUnavailable();
 }
 
+export async function savePurchaseItems(purchaseId, items, conn) {
+  for (const item of items) {
+    await query(
+      'INSERT INTO purchase_items (purchase_id, zone_id, seat_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)',
+      [purchaseId, item.zoneId, item.seatId ?? null, item.quantity, item.unitPrice],
+      conn,
+    );
+  }
+}
+
 async function preflight(userId, reservationId) {
   const reservation = await getReservation(reservationId);
   if (!reservation) throw reservationNotFound();
@@ -180,6 +190,7 @@ export async function processPurchase(userId, { reservationId, paymentMethodToke
         [providerName, result.reference, row.id],
         conn,
       );
+      await savePurchaseItems(row.id, reservation.items, conn);
       return { purchaseId: row.id };
     }),
   );
