@@ -153,7 +153,7 @@ export async function processPurchase(userId, { reservationId, paymentMethodToke
           currency: row.currency,
           paymentMethodToken,
           idempotencyKey: key,
-          metadata: { reservation_id: reservationId, purchase_id: row.id, user_id: userId },
+          metadata: { reservation_id: reservationId, user_id: userId },
         });
       } catch (err) {
         if (err instanceof PaymentUnavailableError) throw gatewayUnavailable();
