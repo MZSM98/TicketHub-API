@@ -173,6 +173,9 @@ services:
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER}
       PAYMENT_MAX_ATTEMPTS: ${PAYMENT_MAX_ATTEMPTS}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_API_BASE: ${STRIPE_API_BASE:-https://api.stripe.com}
+      STRIPE_TIMEOUT_MS: ${STRIPE_TIMEOUT_MS:-10000}
+      TICKET_RETRY_SECONDS: ${TICKET_RETRY_SECONDS:-30}
     depends_on:
       mysql: { condition: service_healthy }
 
