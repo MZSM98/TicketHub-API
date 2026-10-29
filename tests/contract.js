@@ -26,7 +26,31 @@ function mergeAllOf(schema) {
   return merged;
 }
 
+function matchingVariants(variants, value, at) {
+  return variants.filter((variant) => {
+    const variantErrors = [];
+    check(variant, value, at, variantErrors);
+    return variantErrors.length === 0;
+  }).length;
+}
+
+function checkComposition(schema, value, at, errors) {
+  if (value === null && schema.nullable) return;
+  if (schema.oneOf) {
+    const matches = matchingVariants(schema.oneOf, value, at);
+    if (matches !== 1)
+      errors.push(`${at}: coincide con ${matches} opciones de oneOf (se esperaba 1)`);
+  }
+  if (schema.anyOf && matchingVariants(schema.anyOf, value, at) === 0) {
+    errors.push(`${at}: no coincide con ninguna opción de anyOf`);
+  }
+}
+
 function check(rawSchema, value, at, errors) {
+  if (rawSchema.oneOf || rawSchema.anyOf) {
+    checkComposition(rawSchema, value, at, errors);
+    return;
+  }
   const schema = mergeAllOf(rawSchema);
   if (value === null) {
     if (!schema.nullable) errors.push(`${at}: null no permitido`);

@@ -1,4 +1,16 @@
 services:
+  mysql:
+    ports: !reset []
+
+  minio:
+    ports: !reset []
+
+  mailpit:
+    ports: !reset []
+
+  gateway:
+    ports: !reset []
+
   catalog-service:
     environment:
       INVENTORY_SERVICE_URL: http://tests:4100
