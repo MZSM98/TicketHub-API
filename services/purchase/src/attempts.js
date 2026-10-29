@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { query, transaction } from '@tickethub/common/db';
 import { config } from './config.js';
-import { authorize, cancel, capture, providerName, refund } from './payments/index.js';
+import {
+  authorize,
+  cancel,
+  capture,
+  PaymentProviderError,
+  providerName,
+  refund,
+} from './payments/index.js';
 
 export class ClaimLostError extends Error {
   constructor() {
@@ -50,6 +57,14 @@ export async function releaseClaim(claim) {
 export async function findAttempt(id) {
   const [row] = await query('SELECT * FROM payment_attempts WHERE id = ?', [id]);
   return row;
+}
+
+export async function latestAttempt(purchaseId) {
+  const [row] = await query(
+    'SELECT * FROM payment_attempts WHERE purchase_id = ? ORDER BY attempt DESC LIMIT 1',
+    [purchaseId],
+  );
+  return row ?? null;
 }
 
 export async function openAttempt(purchaseId) {
@@ -163,6 +178,20 @@ export async function captureAttempt(claim, attempt) {
     });
   } catch (err) {
     await touch(claim, attempt, err.message);
+    throw err;
+  }
+}
+
+export async function captureOrMarkFailed(claim, attempt) {
+  try {
+    await captureAttempt(claim, attempt);
+  } catch (err) {
+    if (err instanceof PaymentProviderError) {
+      console.error(
+        `Captura rechazada de ${attempt.provider_reference} (compra ${attempt.purchase_id}); la venta queda confirmada y requiere revisión: ${err.message}`,
+      );
+      await setStatus(claim, attempt, 'CAPTURE_FAILED', err.message.slice(0, 255));
+    }
     throw err;
   }
 }

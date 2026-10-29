@@ -56,7 +56,7 @@ CREATE TABLE payment_attempts (
   amount_cents       INT UNSIGNED     NOT NULL,
   currency           ENUM('MXN')      NOT NULL DEFAULT 'MXN',
   provider_reference VARCHAR(255)     NULL,
-  status             ENUM('PENDING', 'AUTHORIZED', 'CAPTURED', 'DECLINED', 'CANCEL_PENDING', 'CANCELED', 'REFUND_PENDING', 'REFUNDED') NOT NULL,
+  status             ENUM('PENDING', 'AUTHORIZED', 'CAPTURED', 'CAPTURE_FAILED', 'DECLINED', 'CANCEL_PENDING', 'CANCELED', 'REFUND_PENDING', 'REFUNDED') NOT NULL,
   decline_code       VARCHAR(100)     NULL,
   last_error         VARCHAR(255)     NULL,
   created_at         DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

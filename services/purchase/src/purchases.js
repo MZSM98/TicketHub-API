@@ -2,11 +2,12 @@ import { query } from '@tickethub/common/db';
 import { forbidden, HttpError, serviceUnavailable } from '@tickethub/common/http';
 import { config } from './config.js';
 import {
-  captureAttempt,
+  captureOrMarkFailed,
   ClaimLostError,
   claimPurchase,
   completePurchase,
   createAttempt,
+  latestAttempt,
   openAttempt,
   recordAuthorization,
   releaseClaim,
@@ -88,6 +89,7 @@ async function preflight(userId, reservationId) {
   if (reservation.userId !== userId) throw forbidden();
   if (reservation.status === 'CONFIRMED') {
     const row = await findByReservation(reservationId);
+    if (row && row.status !== 'PAID' && reservation.purchaseId === row.id) return reservation;
     throw alreadyPaid(row?.id ?? reservation.purchaseId);
   }
   if (reservation.status === 'EXPIRED') throw reservationExpired();
@@ -168,15 +170,23 @@ async function finalize(claim, attempt, reservation) {
   }
   if (sale.status !== 200) throw serviceUnavailable();
   try {
-    await captureAttempt(claim, attempt);
+    await captureOrMarkFailed(claim, attempt);
   } catch (err) {
     throw providerFailure(err);
   }
   await completePurchase(claim, attempt, reservation.items);
 }
 
+async function finishConfirmedSale(claim, reservation) {
+  const attempt = await latestAttempt(claim.purchaseId);
+  if (attempt?.status === 'AUTHORIZED') return finalize(claim, attempt, reservation);
+  if (attempt?.status === 'CAPTURE_FAILED') throw gatewayError();
+  throw serviceUnavailable();
+}
+
 async function runClaimed(claim, userId, reservation, paymentMethodToken) {
   const { purchaseId } = claim;
+  if (reservation.status === 'CONFIRMED') return finishConfirmedSale(claim, reservation);
   let open = await openAttempt(purchaseId);
   if (open?.status === 'PENDING') {
     const outcome = await authorizeAttempt(claim, open, userId);

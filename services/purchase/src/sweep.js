@@ -1,6 +1,6 @@
 import { query } from '@tickethub/common/db';
 import {
-  captureAttempt,
+  captureOrMarkFailed,
   claimPurchase,
   completePurchase,
   findAttempt,
@@ -25,7 +25,7 @@ async function reconcilePending(claim, attempt, userId) {
 async function reconcileAuthorized(claim, attempt) {
   const reservation = await getReservation(attempt.reservation_id);
   if (reservation?.status === 'CONFIRMED' && reservation.purchaseId === attempt.purchase_id) {
-    await captureAttempt(claim, attempt);
+    await captureOrMarkFailed(claim, attempt);
     await completePurchase(claim, attempt, reservation.items);
     await issueFor(attempt.purchase_id);
     return;
