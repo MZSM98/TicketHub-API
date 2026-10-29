@@ -1,7 +1,11 @@
 import { config } from '../config.js';
 import * as stripe from './stripe.js';
 
-export { PaymentProviderError, PaymentUnavailableError } from './errors.js';
+export {
+  PaymentIdempotencyError,
+  PaymentProviderError,
+  PaymentUnavailableError,
+} from './errors.js';
 
 const PROVIDERS = { stripe };
 

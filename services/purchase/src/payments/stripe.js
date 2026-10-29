@@ -1,5 +1,9 @@
 import { config } from '../config.js';
-import { PaymentProviderError, PaymentUnavailableError } from './errors.js';
+import {
+  PaymentIdempotencyError,
+  PaymentProviderError,
+  PaymentUnavailableError,
+} from './errors.js';
 
 export const name = 'stripe';
 
@@ -34,6 +38,14 @@ async function post(path, params, idempotencyKey) {
   }
   if (body === null || typeof body !== 'object') {
     throw new PaymentProviderError('Respuesta de Stripe inválida');
+  }
+  if (body.error?.type === 'idempotency_error') {
+    if (res.status === 409) {
+      throw new PaymentUnavailableError('Stripe sigue procesando la solicitud con esta llave');
+    }
+    throw new PaymentIdempotencyError(
+      `Stripe rechazó la llave de idempotencia: ${body.error.message ?? res.status}`,
+    );
   }
   return { status: res.status, body };
 }

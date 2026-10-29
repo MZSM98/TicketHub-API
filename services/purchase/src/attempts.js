@@ -5,6 +5,7 @@ import {
   authorize,
   cancel,
   capture,
+  PaymentIdempotencyError,
   PaymentProviderError,
   providerName,
   refund,
@@ -128,7 +129,14 @@ export async function sendAuthorization(claim, attempt, userId) {
       },
     });
   } catch (err) {
-    await touch(claim, attempt, err.message);
+    if (err instanceof PaymentIdempotencyError) {
+      console.error(
+        `Intento ${attempt.idempotency_key} marcado FAILED, no se reintentará: ${err.message}`,
+      );
+      await setStatus(claim, attempt, 'FAILED', err.message.slice(0, 255));
+    } else {
+      await touch(claim, attempt, err.message);
+    }
     throw err;
   }
 }
