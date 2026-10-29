@@ -18,7 +18,7 @@
     "mock:build": "node scripts/build-mock-spec.js",
     "mock:check": "node scripts/build-mock-spec.js && git diff --exit-code -- mock/",
     "mock": "npm run mock:build && prism mock -p 4010 mock/tickethub.openapi.json",
-    "test": "docker compose exec -T identity-service npm run create-admin --silent && docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait catalog-service inventory-sweep inventory-lazy inventory-nocatalog && docker compose -f docker-compose.yml -f docker-compose.test.yml --profile test run --rm --use-aliases tests; status=$?; docker compose -f docker-compose.yml -f docker-compose.test.yml rm -sf inventory-sweep inventory-lazy inventory-nocatalog; docker compose up -d --wait catalog-service; exit $status"
+    "test": "docker compose -p tickethub-test -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait && docker compose -p tickethub-test -f docker-compose.yml -f docker-compose.test.yml exec -T identity-service npm run create-admin --silent && docker compose -p tickethub-test -f docker-compose.yml -f docker-compose.test.yml --profile test run --rm --use-aliases tests; status=$?; docker compose -p tickethub-test -f docker-compose.yml -f docker-compose.test.yml --profile test down -v --remove-orphans; exit $status"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -28,5 +28,8 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
     "prettier": "^3.9.10"
+  },
+  "overrides": {
+    "decode-uri-component": "0.5.1"
   }
 }

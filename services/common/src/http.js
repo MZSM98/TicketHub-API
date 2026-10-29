@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { requiredEnv } from './env.js';
+import { requiredEnv, requiredSecret } from './env.js';
 
-const jwtSecret = requiredEnv('JWT_SECRET');
+const jwtSecret = requiredSecret('JWT_SECRET');
 const internalToken = requiredEnv('INTERNAL_TOKEN');
 
 export class HttpError extends Error {
@@ -206,6 +206,13 @@ export function errorHandler(err, _req, res, _next) {
     const body = { code: err.code, message: err.message };
     if (err.details) body.details = err.details;
     return res.status(err.status).json(body);
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'El cuerpo de la petición es demasiado grande',
+      details: { limit: err.limit },
+    });
   }
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({

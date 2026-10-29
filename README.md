@@ -108,14 +108,14 @@ Las pruebas de integración usan `node:test` y `fetch`, y llaman a la API a trav
 
 ```bash
 docker compose up -d --build
-npm test   # crea el admin de .env si no existe y corre tests/ en el contenedor `tests`
+npm test   # levanta un stack aparte (-p tickethub-test), crea el admin, corre tests/ y lo borra
 ```
 
 Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
 
-CatalogService llama a InventoryService para publicar un evento (al menos una zona, `GET /internal/zones?eventId=`) y para borrar un DRAFT (`DELETE /internal/events/{eventId}/zones`), y a PurchaseService para las ventas del resumen CU-16 (`GET /internal/stats/sales`), que aún no existe. `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a `tests/fakes.js`: reenvía las llamadas de zonas al InventoryService real, permite simular que Inventory no responde y hace de PurchaseService falso. Al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras PurchaseService no exista, el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
+CatalogService llama a InventoryService para publicar un evento (al menos una zona, `GET /internal/zones?eventId=`) y para borrar un DRAFT (`DELETE /internal/events/{eventId}/zones`), y a PurchaseService para las ventas del resumen CU-16 (`GET /internal/stats/sales`), que aún no existe. En el stack de pruebas, `docker-compose.test.yml` apunta `catalog-service` a `tests/fakes.js`: reenvía las llamadas de zonas al InventoryService real, permite simular que Inventory no responde y hace de PurchaseService falso. Fuera de las pruebas, mientras PurchaseService no exista, el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
 
-`docker-compose.test.yml` también levanta dos copias de InventoryService con reservas de 3 segundos (`RESERVATION_TTL_MINUTES=0.05`): `inventory-sweep`, con limpieza cada segundo, e `inventory-lazy`, sin limpieza periódica. Las pruebas de vencimiento reservan a través de ellas. `npm test` las quita al terminar. La prueba de concurrencia manda 50 reservas simultáneas por el gateway al mismo asiento y a una zona general, e imprime el resultado.
+`docker-compose.test.yml` también levanta dos copias de InventoryService con reservas de 3 segundos (`RESERVATION_TTL_MINUTES=0.05`): `inventory-sweep`, con limpieza cada segundo, e `inventory-lazy`, sin limpieza periódica. Las pruebas de vencimiento reservan a través de ellas. `npm test` usa su propio proyecto de Compose (`tickethub-test`) sin puertos publicados, así que no toca el stack de desarrollo y puede correr a la vez; al terminar lo borra con `down -v`. La prueba de concurrencia manda 50 reservas simultáneas por el gateway al mismo asiento y a una zona general, e imprime el resultado.
 
 ## CatalogService
 

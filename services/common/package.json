@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     "./http": "./src/http.js",
-    "./db": "./src/db.js"
+    "./db": "./src/db.js",
+    "./env": "./src/env.js"
   },
   "engines": {
     "node": ">=20"

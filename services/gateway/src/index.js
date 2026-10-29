@@ -3,11 +3,11 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import { authMode, resolveService } from './routes.js';
+import { checkJwtSecret } from './secret.js';
 
 const API_PREFIX = '/api/v1';
 const port = Number(process.env.PORT ?? 8080);
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) throw new Error('Falta la variable de entorno JWT_SECRET');
+const jwtSecret = checkJwtSecret(process.env.JWT_SECRET);
 // Sin respuesta del servicio en este tiempo, el gateway responde 503.
 const PROXY_TIMEOUT_MS = 15_000;
 // El timeout del agente también cubre la conexión TCP; proxyTimeout solo cuenta ya conectado.
