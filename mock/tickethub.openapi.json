@@ -12876,7 +12876,7 @@
         ],
         "operationId": "processPurchase",
         "summary": "Pay an active reservation (CU-08)",
-        "description": "**Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never\nfrom the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.\n",
+        "description": "**Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never\nfrom the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.\n\n**Idempotency.** The server guarantees at most one charge per reservation; an\n`Idempotency-Key` header sent by the client is ignored. Simultaneous requests for the same\nreservation are processed one at a time. After a 503 `PAYMENT_GATEWAY_UNAVAILABLE` (for\nexample a provider timeout), a retry first resolves the earlier attempt with the provider:\nif that attempt was approved, the purchase is completed with it and the\n`paymentMethodToken` of the retry is not charged.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -14016,7 +14016,7 @@
         ],
         "operationId": "getEventSales",
         "summary": "Sales dashboard of my event (CU-13)",
-        "description": "**Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;\n403 `NOT_EVENT_OWNER` for another organizer's event).\n`purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`; `ticketsSold`, `capacity`\nand `byZone` come from InventoryService `GET /internal/zones?eventId=`.\n",
+        "description": "**Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;\n403 `NOT_EVENT_OWNER` for another organizer's event).\n`purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`.\n`byZone[].revenue` comes from PurchaseService: the unit price actually paid for each item\nof those purchases, so it does not change if the zone price is edited later and the sum of\n`byZone[].revenue` equals `grossRevenue`. `ticketsSold`, `capacity` and the other `byZone`\nfields (`name`, current `price`, `capacity`, `sold`, `reserved`) come from InventoryService\n`GET /internal/zones?eventId=`.\n",
         "responses": {
           "200": {
             "description": "Metrics for charts and revenue.",

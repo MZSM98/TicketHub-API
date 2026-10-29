@@ -9,8 +9,10 @@ info:
     Use cases: CU-08 (includes CU-09), CU-13. Internal stats serve CU-16.
 
     **CU-08 flow** (sequence diagram): check reservation with InventoryService
-    (`GET /internal/reservations/{id}`) -> charge the payment provider -> save purchase ->
-    `POST /internal/reservations/{id}/confirm-sale` -> `POST /internal/tickets/issue` in TicketService.
+    (`GET /internal/reservations/{id}`) -> authorize the payment (manual capture) ->
+    `POST /internal/reservations/{id}/confirm-sale` -> capture the payment -> save purchase ->
+    `POST /internal/tickets/issue` in TicketService. If confirm-sale fails, the authorization is
+    cancelled and the buyer is not charged.
     If ticket issuance fails, the purchase is still PAID and the issue call is queued for retry
     (CU-09 EX1); the response then says `ticketIssuance: PENDING`.
 
@@ -51,6 +53,13 @@ paths:
       description: |
         **Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never
         from the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.
+
+        **Idempotency.** The server guarantees at most one charge per reservation; an
+        `Idempotency-Key` header sent by the client is ignored. Simultaneous requests for the same
+        reservation are processed one at a time. After a 503 `PAYMENT_GATEWAY_UNAVAILABLE` (for
+        example a provider timeout), a retry first resolves the earlier attempt with the provider:
+        if that attempt was approved, the purchase is completed with it and the
+        `paymentMethodToken` of the retry is not charged.
       requestBody:
         required: true
         content:
@@ -240,8 +249,12 @@ paths:
       description: |
         **Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;
         403 `NOT_EVENT_OWNER` for another organizer's event).
-        `purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`; `ticketsSold`, `capacity`
-        and `byZone` come from InventoryService `GET /internal/zones?eventId=`.
+        `purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`.
+        `byZone[].revenue` comes from PurchaseService: the unit price actually paid for each item
+        of those purchases, so it does not change if the zone price is edited later and the sum of
+        `byZone[].revenue` equals `grossRevenue`. `ticketsSold`, `capacity` and the other `byZone`
+        fields (`name`, current `price`, `capacity`, `sold`, `reserved`) come from InventoryService
+        `GET /internal/zones?eventId=`.
       responses:
         '200':
           description: Metrics for charts and revenue.
