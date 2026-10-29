@@ -12,6 +12,7 @@ import {
   INTERNAL_TOKEN,
   INVENTORY,
   INVENTORY_LAZY,
+  INVENTORY_NOCATALOG,
   INVENTORY_SWEEP,
   login,
   RUN,
@@ -249,7 +250,10 @@ describe('InventoryService (inventory.yaml)', () => {
         },
         '/zones/{zoneId}',
       );
-      assert.equal(typeChange.code, 'ZONE_TYPE_CHANGE');
+      assert.deepEqual(
+        [typeChange.code, typeChange.details],
+        ['ZONE_TYPE_CHANGE', { type: 'GENERAL' }],
+      );
       const temp = await addZone(s.event.id, {
         name: 'Temporal',
         type: 'GENERAL',
@@ -368,23 +372,14 @@ describe('InventoryService (inventory.yaml)', () => {
         seatsPath,
       );
       s.foreignSeat = other.rows[0].seats[0].id;
-      const publicMap = await expectContract(
+      const hidden = await expectContract(
         'GET',
         `/zones/${s.numbered.id}/seats`,
-        200,
+        404,
         {},
         seatsPath,
       );
-      assert.equal(publicMap.price, '500.00');
-      assert.ok(publicMap.rows.every((r) => r.seats.every((seat) => seat.status === 'AVAILABLE')));
-      const notNumbered = await expectContract(
-        'GET',
-        `/zones/${s.general.id}/seats`,
-        409,
-        {},
-        seatsPath,
-      );
-      assert.equal(notNumbered.code, 'ZONE_NOT_NUMBERED');
+      assert.equal(hidden.code, 'ZONE_NOT_FOUND', 'zona de un evento DRAFT');
     });
 
     test('disponibilidad: borrador -> 404; publicado -> 200 público', async () => {
@@ -405,6 +400,24 @@ describe('InventoryService (inventory.yaml)', () => {
           [s.pista.id, 30, false],
         ],
       );
+      const seatsPath = '/zones/{zoneId}/seats';
+      const publicMap = await expectContract(
+        'GET',
+        `/zones/${s.numbered.id}/seats`,
+        200,
+        {},
+        seatsPath,
+      );
+      assert.equal(publicMap.price, '500.00');
+      assert.ok(publicMap.rows.every((r) => r.seats.every((seat) => seat.status === 'AVAILABLE')));
+      const notNumbered = await expectContract(
+        'GET',
+        `/zones/${s.general.id}/seats`,
+        409,
+        {},
+        seatsPath,
+      );
+      assert.equal(notNumbered.code, 'ZONE_NOT_NUMBERED');
     });
   });
 
@@ -965,6 +978,14 @@ describe('InventoryService (inventory.yaml)', () => {
       const tpl = '/events/{eventId}/availability';
       const gone = await expectContract('GET', `/events/${s.other.id}/availability`, 410, {}, tpl);
       assert.equal(gone.code, 'EVENT_NOT_AVAILABLE');
+      const seats = await expectContract(
+        'GET',
+        `/zones/${s.otherSeats.id}/seats`,
+        410,
+        {},
+        '/zones/{zoneId}/seats',
+      );
+      assert.equal(seats.code, 'EVENT_NOT_AVAILABLE');
       const reserve = await expectContract('POST', '/reservations', 410, {
         token: s.buyers[5],
         body: { eventId: s.other.id, items: [{ seatId: s.foreignSeat }] },
@@ -1022,6 +1043,43 @@ describe('InventoryService (inventory.yaml)', () => {
       );
       const { res } = await internalCall('DELETE', `/internal/events/${draft.id}/zones`);
       assert.equal(res.status, 204, 'idempotente');
+    });
+  });
+
+  describe('Catalog no disponible', () => {
+    test('toda operación que consulta a Catalog -> 503 SERVICE_UNAVAILABLE según el contrato', async () => {
+      const base = INVENTORY_NOCATALOG;
+      const org = s.orgA.token;
+      const zoneBody = { name: 'Z', type: 'GENERAL', price: '1.00', capacity: 1 };
+      const cases = [
+        ['GET', `/events/${s.event.id}/availability`, '/events/{eventId}/availability', {}],
+        ['GET', `/zones/${s.numbered.id}/seats`, '/zones/{zoneId}/seats', {}],
+        ['GET', `/events/${s.event.id}/zones`, zonePath, { token: org }],
+        ['POST', `/events/${s.event.id}/zones`, zonePath, { token: org, body: zoneBody }],
+        ['PUT', `/zones/${s.pista.id}`, '/zones/{zoneId}', { token: org, body: zoneBody }],
+        ['DELETE', `/zones/${s.pista.id}`, '/zones/{zoneId}', { token: org }],
+        [
+          'POST',
+          `/zones/${s.numbered.id}/seats`,
+          '/zones/{zoneId}/seats',
+          { token: org, body: { rows: [{ rowLabel: 'A', seatCount: 6 }] } },
+        ],
+        [
+          'POST',
+          '/reservations',
+          '/reservations',
+          {
+            token: s.buyers[6],
+            body: { eventId: s.event.id, items: [{ zoneId: s.pista.id, quantity: 1 }] },
+          },
+        ],
+      ];
+      for (const [method, path, template, options] of cases) {
+        const err = await expectContract(method, path, 503, { ...options, base }, template);
+        assert.equal(err.code, 'SERVICE_UNAVAILABLE', `${method} ${path}`);
+      }
+      assert.equal((await zoneCounters(s.pista.id)).name, 'Pista VIP', 'no se modificó');
+      await expectContract('GET', '/reservations/active', 404, { token: s.buyers[6], base });
     });
   });
 });
