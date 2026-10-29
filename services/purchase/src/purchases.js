@@ -3,6 +3,7 @@ import { forbidden, HttpError, serviceUnavailable } from '@tickethub/common/http
 import { config } from './config.js';
 import {
   captureAttempt,
+  ClaimLostError,
   claimPurchase,
   completePurchase,
   createAttempt,
@@ -140,14 +141,14 @@ function providerFailure(err) {
   return err;
 }
 
-async function authorizeAttempt(attempt, userId) {
+async function authorizeAttempt(claim, attempt, userId) {
   let result;
   try {
-    result = await sendAuthorization(attempt, userId);
+    result = await sendAuthorization(claim, attempt, userId);
   } catch (err) {
     throw providerFailure(err);
   }
-  const recorded = await recordAuthorization(attempt, result);
+  const recorded = await recordAuthorization(claim, attempt, result);
   if (recorded.authorized) return recorded.attempt;
   if (recorded.failedAttempts >= config.paymentMaxAttempts) {
     throw await exhausted(attempt.reservation_id);
@@ -157,39 +158,40 @@ async function authorizeAttempt(attempt, userId) {
   };
 }
 
-async function finalize(attempt, reservation) {
+async function finalize(claim, attempt, reservation) {
   const sale = await confirmSale(attempt.reservation_id, attempt.purchase_id).catch(() => ({
     status: 503,
   }));
   if (sale.status === 409 || sale.status === 410) {
-    await undoAttempt(attempt);
+    await undoAttempt(claim, attempt);
     throw saleFailure(sale.status);
   }
   if (sale.status !== 200) throw serviceUnavailable();
   try {
-    await captureAttempt(attempt);
+    await captureAttempt(claim, attempt);
   } catch (err) {
     throw providerFailure(err);
   }
-  await completePurchase(attempt, reservation.items);
+  await completePurchase(claim, attempt, reservation.items);
 }
 
-async function runClaimed(purchaseId, userId, reservation, paymentMethodToken) {
+async function runClaimed(claim, userId, reservation, paymentMethodToken) {
+  const { purchaseId } = claim;
   let open = await openAttempt(purchaseId);
   if (open?.status === 'PENDING') {
-    const outcome = await authorizeAttempt(open, userId);
+    const outcome = await authorizeAttempt(claim, open, userId);
     if (outcome.declined) open = null;
     else open = outcome;
   }
-  if (open) return finalize(open, reservation);
+  if (open) return finalize(claim, open, reservation);
   const row = await purchaseById(purchaseId);
   if (row.failed_attempts >= config.paymentMaxAttempts) {
     throw await exhausted(row.reservation_id);
   }
-  const attempt = await createAttempt(row, paymentMethodToken, toCents(row.total));
-  const outcome = await authorizeAttempt(attempt, userId);
+  const attempt = await createAttempt(claim, row, paymentMethodToken, toCents(row.total));
+  const outcome = await authorizeAttempt(claim, attempt, userId);
   if (outcome.declined) throw outcome.declined;
-  return finalize(outcome, reservation);
+  return finalize(claim, outcome, reservation);
 }
 
 export async function processPurchase(userId, { reservationId, paymentMethodToken }) {
@@ -200,7 +202,13 @@ export async function processPurchase(userId, { reservationId, paymentMethodToke
   try {
     const current = await purchaseById(row.id);
     if (current.status === 'PAID') throw alreadyPaid(current.id);
-    await runClaimed(row.id, userId, reservation, paymentMethodToken);
+    await runClaimed(claim, userId, reservation, paymentMethodToken);
+  } catch (err) {
+    if (err instanceof ClaimLostError) {
+      console.error(`Compra ${row.id}: ${err.message}; no se guardó el resultado`);
+      throw gatewayUnavailable();
+    }
+    throw err;
   } finally {
     await releaseClaim(claim).catch(() => null);
   }

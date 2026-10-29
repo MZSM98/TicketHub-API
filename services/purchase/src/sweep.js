@@ -13,39 +13,38 @@ import { config } from './config.js';
 import { getReservation, releaseReservation } from './services.js';
 import { issueFor } from './tickets.js';
 
-async function reconcilePending(attempt, userId) {
-  const result = await sendAuthorization(attempt, userId);
-  const recorded = await recordAuthorization(attempt, result);
-  if (recorded.authorized) return undoAttempt(recorded.attempt);
+async function reconcilePending(claim, attempt, userId) {
+  const result = await sendAuthorization(claim, attempt, userId);
+  const recorded = await recordAuthorization(claim, attempt, result);
+  if (recorded.authorized) return undoAttempt(claim, recorded.attempt);
   if (recorded.failedAttempts >= config.paymentMaxAttempts) {
     await releaseReservation(attempt.reservation_id).catch(() => false);
   }
 }
 
-async function reconcileAuthorized(attempt) {
+async function reconcileAuthorized(claim, attempt) {
   const reservation = await getReservation(attempt.reservation_id);
-  if (!reservation) return undoAttempt(attempt);
-  if (reservation.status === 'CONFIRMED' && reservation.purchaseId === attempt.purchase_id) {
-    await captureAttempt(attempt);
-    await completePurchase(attempt, reservation.items);
+  if (reservation?.status === 'CONFIRMED' && reservation.purchaseId === attempt.purchase_id) {
+    await captureAttempt(claim, attempt);
+    await completePurchase(claim, attempt, reservation.items);
     await issueFor(attempt.purchase_id);
     return;
   }
-  return undoAttempt(attempt);
+  return undoAttempt(claim, attempt);
 }
 
 async function reconcile(row) {
   const claim = await claimPurchase(row.purchase_id);
-  if (!claim && (row.status === 'PENDING' || row.status === 'AUTHORIZED')) return;
+  if (!claim) return;
   try {
     const attempt = await findAttempt(row.id);
-    if (attempt.status === 'PENDING') return await reconcilePending(attempt, row.user_id);
-    if (attempt.status === 'AUTHORIZED') return await reconcileAuthorized(attempt);
+    if (attempt.status === 'PENDING') return await reconcilePending(claim, attempt, row.user_id);
+    if (attempt.status === 'AUTHORIZED') return await reconcileAuthorized(claim, attempt);
     if (attempt.status === 'CANCEL_PENDING' || attempt.status === 'REFUND_PENDING') {
-      return await undoAttempt(attempt);
+      return await undoAttempt(claim, attempt);
     }
   } finally {
-    if (claim) await releaseClaim(claim).catch(() => null);
+    await releaseClaim(claim).catch(() => null);
   }
 }
 
@@ -59,7 +58,7 @@ export async function sweepPayments() {
          FROM payment_attempts a JOIN purchases p ON p.id = a.purchase_id
         WHERE a.status IN ('PENDING', 'AUTHORIZED', 'CANCEL_PENDING', 'REFUND_PENDING')
           AND a.updated_at < DATE_SUB(NOW(3), INTERVAL ? SECOND)
-        ORDER BY a.id LIMIT 50`,
+        ORDER BY a.updated_at LIMIT 50`,
       [config.reconcileAfterSeconds],
     );
     for (const row of rows) {

@@ -39,5 +39,6 @@ export const config = {
   },
 };
 
-config.claimSeconds =
-  Math.ceil((3 * config.stripe.timeoutMs + 3 * config.internalTimeoutMs) / 1000) + 5;
+config.claimSeconds = process.env.PAYMENT_CLAIM_SECONDS
+  ? positiveNumber('PAYMENT_CLAIM_SECONDS', 0)
+  : Math.ceil((5 * config.stripe.timeoutMs + 2 * config.internalTimeoutMs) / 1000) + 10;
