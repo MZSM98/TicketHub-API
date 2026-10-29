@@ -44,6 +44,16 @@ const pay = (token, reservationId, paymentMethodToken, status, base) =>
 
 const chargesOf = (reservationId) =>
   fakes.stripe.charges.filter((charge) => charge.reservationId === reservationId);
+const netChargesOf = (reservationId) =>
+  chargesOf(reservationId).filter((c) => c.status === 'succeeded' && !c.refunded);
+const orphansOf = (reservationId) =>
+  chargesOf(reservationId).filter((c) => c.status === 'requires_capture');
+
+async function waitFor(check, ms = 15000) {
+  const started = Date.now();
+  while (!check() && Date.now() - started < ms) await sleep(200);
+  return check();
+}
 const intentRequestsOf = (reservationId) =>
   fakes.stripe.requests.filter(
     (r) =>
@@ -193,7 +203,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.equal(request.contentType, 'application/x-www-form-urlencoded');
     assert.match(
       request.idempotencyKey,
-      new RegExp(`^tickethub-reservation-${reservation.id}-attempt-1-`),
+      new RegExp(`^tickethub-reservation-${reservation.id}-attempt-1$`),
     );
     assert.deepEqual(
       [
@@ -201,8 +211,9 @@ describe('PurchaseService (purchase.yaml)', () => {
         request.params.currency,
         request.params.payment_method,
         request.params.confirm,
+        request.params.capture_method,
       ],
-      ['100000', 'mxn', 'pm_card_visa', 'true'],
+      ['100000', 'mxn', 'pm_card_visa', 'true', 'manual'],
     );
     const ticketCall = fakes.tickets.calls.find((c) => c.purchaseId === purchase.id);
     assert.deepEqual(ticketCall, {
@@ -221,7 +232,8 @@ describe('PurchaseService (purchase.yaml)', () => {
       [again.code, again.details],
       ['RESERVATION_ALREADY_PAID', { purchaseId: purchase.id }],
     );
-    assert.equal(chargesOf(reservation.id).length, 1);
+    assert.equal(netChargesOf(reservation.id).length, 1);
+    assert.equal(orphansOf(reservation.id).length, 0);
     const got = await expectContract(
       'GET',
       `/purchases/${purchase.id}`,
@@ -344,12 +356,14 @@ describe('PurchaseService (purchase.yaml)', () => {
     } finally {
       fakes.stripe.delayMs = 0;
     }
-    assert.equal(chargesOf(reservation.id).length, 1, 'Stripe sí registró el cargo');
+    assert.equal(chargesOf(reservation.id).length, 1, 'Stripe sí registró la autorización');
     const replaysBefore = fakes.stripe.replays;
     const retry = await pay(token, reservation.id, 'pm_card_visa', 201);
     assert.equal(retry.purchase.paymentReference, chargesOf(reservation.id)[0].id);
     assert.equal(retry.purchase.failedAttempts, 0);
-    assert.equal(chargesOf(reservation.id).length, 1, 'sin doble cargo');
+    assert.equal(chargesOf(reservation.id).length, 1, 'sin doble autorización');
+    assert.equal(netChargesOf(reservation.id).length, 1, 'un cargo neto');
+    assert.equal(orphansOf(reservation.id).length, 0);
     assert.equal(fakes.stripe.replays, replaysBefore + 1);
     const keys = new Set(intentRequestsOf(reservation.id).map((r) => r.idempotencyKey));
     assert.equal(keys.size, 1);
@@ -409,7 +423,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.equal(notActive.code, 'RESERVATION_NOT_ACTIVE');
   });
 
-  test('la reserva vence durante el cobro -> se reembolsa y responde 410', async () => {
+  test('la reserva vence durante la autorización -> se cancela la autorización y responde 410', async () => {
     const token = s.buyers[6];
     const short = await reserve(token, [seat(8)], INVENTORY_LAZY);
     await sleep(Math.max(0, Date.parse(short.expiresAt) - Date.now() - 1000));
@@ -421,14 +435,40 @@ describe('PurchaseService (purchase.yaml)', () => {
       fakes.stripe.delayMs = 0;
     }
     const [charge] = chargesOf(short.id);
-    assert.ok(charge, 'hubo cargo');
-    assert.ok(fakes.stripe.refunds.includes(charge.id), 'y se reembolsó');
+    assert.ok(charge, 'hubo autorización');
+    assert.equal(charge.status, 'canceled', 'y se canceló sin capturar');
+    assert.equal(netChargesOf(short.id).length, 0);
     const mine = await expectContract('GET', '/purchases/me', 200, { token });
     assert.equal(mine.totalItems, 0);
-    console.log(`[vence durante el cobro] cargo ${charge.id} reembolsado`);
+    console.log(`[vence durante la autorización] ${charge.id} cancelada`);
   });
 
-  test('TicketService falla -> compra PAID con ticketIssuance PENDING y se reintenta sola', async () => {
+  test('la cancelación falla -> queda pendiente y el barrido la reintenta', async () => {
+    const token = s.buyers[6];
+    const short = await reserve(token, [seat(9)], INVENTORY_LAZY);
+    await sleep(Math.max(0, Date.parse(short.expiresAt) - Date.now() - 1000));
+    fakes.stripe.delayMs = 1400;
+    fakes.stripe.failCancels = true;
+    try {
+      const expired = await pay(token, short.id, 'pm_card_visa', 410);
+      assert.equal(expired.code, 'RESERVATION_EXPIRED');
+    } finally {
+      fakes.stripe.delayMs = 0;
+    }
+    const [charge] = chargesOf(short.id);
+    assert.equal(charge.status, 'requires_capture', 'la cancelación falló');
+    const failedCancels = fakes.stripe.requests.filter(
+      (r) => r.path === `/v1/payment_intents/${charge.id}/cancel`,
+    ).length;
+    assert.ok(failedCancels >= 1);
+    fakes.stripe.failCancels = false;
+    const started = Date.now();
+    assert.ok(await waitFor(() => charge.status === 'canceled'), 'el barrido canceló');
+    assert.equal(netChargesOf(short.id).length, 0);
+    console.log(`[barrido] cancelación reintentada en ${Date.now() - started} ms`);
+  });
+
+  test('TicketService falla -> PAID con ticketIssuance PENDING; otro proceso sin memoria lo emite desde la BD', async () => {
     const token = s.buyers[7];
     const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 3 }]);
     fakes.tickets.up = false;
@@ -450,6 +490,47 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.equal(issued?.length, 3, 'reintento emitió los boletos');
     console.log(`[boletos] emitidos por reintento en ${Date.now() - started} ms`);
     s.paid.push(result.purchase);
+  });
+
+  test('timeout con pm_delay3000 y reintento con otra tarjeta -> 1 cargo neto y 0 huérfanas', async () => {
+    const token = s.buyers[8];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    const started = Date.now();
+    const timeout = await pay(token, reservation.id, 'pm_delay3000', 503);
+    assert.equal(timeout.code, 'PAYMENT_GATEWAY_UNAVAILABLE');
+    assert.ok(Date.now() - started < 2500, 'respondió por timeout');
+    const retry = await pay(token, reservation.id, 'pm_card_visa', 201);
+    const [slow] = chargesOf(reservation.id);
+    assert.equal(slow.paymentMethod, 'pm_delay3000');
+    assert.equal(retry.purchase.paymentReference, slow.id);
+    await sleep(Math.max(0, 3200 - (Date.now() - started)));
+    assert.equal(chargesOf(reservation.id).length, 1);
+    assert.equal(netChargesOf(reservation.id).length, 1);
+    assert.equal(orphansOf(reservation.id).length, 0);
+    const requests = intentRequestsOf(reservation.id);
+    assert.ok(requests.every((r) => r.params.payment_method === 'pm_delay3000'));
+    assert.equal(new Set(requests.map((r) => r.idempotencyKey)).size, 1);
+    console.log(
+      `[timeout + otra tarjeta] solicitudes=${requests.length} autorizaciones=${chargesOf(reservation.id).length} cargos netos=${netChargesOf(reservation.id).length} huérfanas=${orphansOf(reservation.id).length}`,
+    );
+    s.paid.push(retry.purchase);
+  });
+
+  test('timeout sin reintento -> el barrido concilia y cancela la autorización huérfana', async () => {
+    const token = s.buyers[9];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    await pay(token, reservation.id, 'pm_delay3000', 503);
+    assert.ok(await waitFor(() => chargesOf(reservation.id)[0]?.status === 'canceled'));
+    assert.equal(chargesOf(reservation.id).length, 1);
+    assert.equal(netChargesOf(reservation.id).length, 0);
+    assert.equal(orphansOf(reservation.id).length, 0);
+    await expectContract(
+      'POST',
+      `/reservations/${reservation.id}/cancel`,
+      200,
+      { token },
+      '/reservations/{reservationId}/cancel',
+    );
   });
 
   test('Inventory caído -> 503 SERVICE_UNAVAILABLE sin cobrar', async () => {
@@ -484,13 +565,17 @@ describe('PurchaseService (purchase.yaml)', () => {
         purchases: s.paid.length,
         grossRevenue: gross,
         capacity: 112,
-        ticketsSold: 10,
+        ticketsSold: 11,
         platea: [4, '2000.00'],
-        general: [6, '1500.00'],
+        general: [7, '1750.00'],
         byDay: [{ date: today, purchases: s.paid.length, revenue: `${gross / 100}.00` }],
       },
     );
-    assert.equal(sales.occupancyRate, Number((10 / 112).toFixed(4)));
+    assert.equal(sales.occupancyRate, Number((11 / 112).toFixed(4)));
+    assert.equal(
+      sales.byZone.reduce((sum, z) => sum + cents(z.revenue), 0),
+      cents(sales.grossRevenue),
+    );
     const other = await expectContract('GET', path, 403, { token: s.otherOrg.token }, tpl);
     assert.equal(other.code, 'NOT_EVENT_OWNER');
     await expectContract('GET', path, 403, { token: s.buyers[0] }, tpl);
@@ -511,6 +596,35 @@ describe('PurchaseService (purchase.yaml)', () => {
       tpl,
     );
     assert.equal(down.code, 'SERVICE_UNAVAILABLE');
+  });
+
+  test('cambiar el precio de una zona después de vender no altera byZone: suma igual a grossRevenue', async () => {
+    const path = `/events/${s.event.id}/sales`;
+    const tpl = '/events/{eventId}/sales';
+    const cents = (m) => Number(m.replace('.', ''));
+    const before = await expectContract('GET', path, 200, { token: s.org.token }, tpl);
+    await expectContract(
+      'PUT',
+      `/zones/${s.general.id}`,
+      200,
+      {
+        token: s.org.token,
+        body: { name: 'General', type: 'GENERAL', price: '999.00', capacity: 100 },
+      },
+      '/zones/{zoneId}',
+    );
+    const after = await expectContract('GET', path, 200, { token: s.org.token }, tpl);
+    const general = (sales) => sales.byZone.find((z) => z.zoneId === s.general.id);
+    assert.equal(general(after).price, '999.00');
+    assert.equal(general(after).revenue, general(before).revenue);
+    assert.equal(after.grossRevenue, before.grossRevenue);
+    assert.equal(
+      after.byZone.reduce((sum, z) => sum + cents(z.revenue), 0),
+      cents(after.grossRevenue),
+    );
+    console.log(
+      `[precio cambiado] General ${general(before).price} -> ${general(after).price}; revenue ${general(after).revenue}; grossRevenue ${after.grossRevenue}`,
+    );
   });
 
   test('GET /internal/stats/sales: totales de compras PAID; sin token 401; no pasa por el gateway', async () => {
