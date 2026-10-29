@@ -11,11 +11,13 @@ export const fakes = {
   salesUp: true,
   tokens: [],
   deletedZones: [],
-  tickets: { up: true, calls: [], issued: new Map() },
+  tickets: { up: true, failFor: new Set(), calls: [], issued: new Map() },
   stripe: {
     mode: 'normal',
     delayMs: 0,
     failCancels: false,
+    idempotencyErrorFor: new Set(),
+    captureFailures: new Map(),
     requests: [],
     charges: [],
     intents: new Map(),
@@ -168,7 +170,41 @@ async function handleStripe(req, res, url) {
     return res.end('<html>proxy error</html>');
   }
   const key = req.headers['idempotency-key'];
+  const reservationId = Number(params.get('metadata[reservation_id]'));
+  if (url.pathname === '/v1/payment_intents' && stripe.idempotencyErrorFor.has(reservationId)) {
+    return send(res, 400, {
+      error: {
+        type: 'idempotency_error',
+        message: 'Keys for idempotent requests can only be used with the same parameters',
+      },
+    });
+  }
+  const captured = /^\/v1\/payment_intents\/([^/]+)\/capture$/.exec(url.pathname);
+  const failure = captured
+    ? stripe.captureFailures.get(stripe.intents.get(captured[1])?.reservationId)
+    : null;
+  if (failure && failure.times > 0 && failure.mode !== 'drop') {
+    failure.times--;
+    if (failure.mode === '503') return send(res, 503, { error: { type: 'api_error' } });
+    return send(res, 400, {
+      error: {
+        type: 'invalid_request_error',
+        code: 'charge_expired_for_capture',
+        message: 'The charge has expired and can no longer be captured.',
+      },
+    });
+  }
   const seen = key ? stripe.idempotency.get(key) : undefined;
+  if (seen?.inFlight) {
+    stripe.inUse = (stripe.inUse ?? 0) + 1;
+    return send(res, 409, {
+      error: {
+        type: 'idempotency_error',
+        code: 'idempotency_key_in_use',
+        message: 'There is currently another in-progress request using this Idempotent Key',
+      },
+    });
+  }
   let status;
   let body;
   if (seen && seen.raw !== raw) {
@@ -186,10 +222,16 @@ async function handleStripe(req, res, url) {
     [status, body] = [seen.status, seen.body];
   } else {
     [status, body] = stripeRoute(url.pathname, params);
-    if (key) stripe.idempotency.set(key, { raw, status, body });
+    if (key) stripe.idempotency.set(key, { raw, status, body, inFlight: true });
   }
   const delay = stripe.delayMs + (seen ? 0 : (SLOW_METHODS[params.get('payment_method')] ?? 0));
   if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+  const stored = key ? stripe.idempotency.get(key) : undefined;
+  if (stored) stored.inFlight = false;
+  if (failure && failure.mode === 'drop' && failure.times > 0) {
+    failure.times--;
+    return res.destroy();
+  }
   if (res.destroyed) return;
   res.writeHead(status, {
     'content-type': 'application/json',
@@ -201,7 +243,7 @@ async function handleStripe(req, res, url) {
 async function handleTickets(req, res) {
   const payload = JSON.parse(await readBody(req));
   fakes.tickets.calls.push(payload);
-  if (!fakes.tickets.up) {
+  if (!fakes.tickets.up || fakes.tickets.failFor.has(payload.purchaseId)) {
     return send(res, 500, {
       code: 'QR_GENERATION_FAILED',
       message: 'Error al generar el boleto digital',
