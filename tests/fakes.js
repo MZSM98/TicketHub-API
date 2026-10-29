@@ -15,8 +15,10 @@ export const fakes = {
   stripe: {
     mode: 'normal',
     delayMs: 0,
+    failCancels: false,
     requests: [],
     charges: [],
+    intents: new Map(),
     refunds: [],
     replays: 0,
     idempotency: new Map(),
@@ -50,18 +52,26 @@ const DECLINES = {
   pm_card_insufficientFunds: 'insufficient_funds',
 };
 
+const APPROVED = new Set(['pm_card_visa', 'pm_delay3000']);
+export const SLOW_METHODS = { pm_delay3000: 3000 };
+
 function paymentIntent(params) {
   const id = `pi_fake_${randomUUID().replaceAll('-', '').slice(0, 20)}`;
+  const manual = params.get('capture_method') === 'manual';
   const record = {
     id,
     amount: Number(params.get('amount')),
     currency: params.get('currency'),
     paymentMethod: params.get('payment_method'),
     reservationId: Number(params.get('metadata[reservation_id]')),
+    attempt: Number(params.get('metadata[attempt]')),
+    status: manual ? 'requires_capture' : 'succeeded',
+    refunded: false,
   };
-  if (params.get('payment_method') === 'pm_card_visa') {
+  if (APPROVED.has(params.get('payment_method'))) {
     fakes.stripe.charges.push(record);
-    return [200, { id, object: 'payment_intent', status: 'succeeded', amount: record.amount }];
+    fakes.stripe.intents.set(id, record);
+    return [200, { id, object: 'payment_intent', status: record.status, amount: record.amount }];
   }
   const declineCode = DECLINES[params.get('payment_method')];
   if (declineCode) {
@@ -91,6 +101,32 @@ function paymentIntent(params) {
   ];
 }
 
+function unexpectedState(intent) {
+  return [
+    400,
+    {
+      error: {
+        type: 'invalid_request_error',
+        code: 'payment_intent_unexpected_state',
+        payment_intent: { id: intent.id, object: 'payment_intent', status: intent.status },
+      },
+    },
+  ];
+}
+
+function intentAction(id, action) {
+  const intent = fakes.stripe.intents.get(id) ?? { id, status: 'requires_payment_method' };
+  if (action === 'capture') {
+    if (intent.status !== 'requires_capture') return unexpectedState(intent);
+    intent.status = 'succeeded';
+  } else {
+    if (intent.status === 'succeeded' || intent.status === 'canceled')
+      return unexpectedState(intent);
+    intent.status = 'canceled';
+  }
+  return [200, { id, object: 'payment_intent', status: intent.status }];
+}
+
 function stripeRoute(path, params) {
   if (path === '/v1/payment_intents') return paymentIntent(params);
   if (path === '/v1/refunds') {
@@ -100,10 +136,12 @@ function stripeRoute(path, params) {
       status: 'succeeded',
     };
     fakes.stripe.refunds.push(params.get('payment_intent'));
+    const intent = fakes.stripe.intents.get(params.get('payment_intent'));
+    if (intent) intent.refunded = true;
     return [200, { ...refund, payment_intent: params.get('payment_intent') }];
   }
-  const cancel = /^\/v1\/payment_intents\/([^/]+)\/cancel$/.exec(path);
-  if (cancel) return [200, { id: cancel[1], object: 'payment_intent', status: 'canceled' }];
+  const action = /^\/v1\/payment_intents\/([^/]+)\/(cancel|capture)$/.exec(path);
+  if (action) return intentAction(action[1], action[2]);
   return [404, { error: { type: 'invalid_request_error', message: 'Unrecognized request URL' } }];
 }
 
@@ -122,6 +160,9 @@ async function handleStripe(req, res, url) {
     return send(res, 401, { error: { type: 'invalid_request_error', message: 'Invalid API Key' } });
   }
   if (stripe.mode === 'down') return send(res, 503, { error: { type: 'api_error' } });
+  if (stripe.failCancels && /\/(cancel|refunds)$/.test(url.pathname)) {
+    return send(res, 503, { error: { type: 'api_error' } });
+  }
   if (stripe.mode === 'garbage') {
     res.writeHead(200, { 'content-type': 'text/html' });
     return res.end('<html>proxy error</html>');
@@ -147,7 +188,8 @@ async function handleStripe(req, res, url) {
     [status, body] = stripeRoute(url.pathname, params);
     if (key) stripe.idempotency.set(key, { raw, status, body });
   }
-  if (stripe.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, stripe.delayMs));
+  const delay = stripe.delayMs + (seen ? 0 : (SLOW_METHODS[params.get('payment_method')] ?? 0));
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
   if (res.destroyed) return;
   res.writeHead(status, {
     'content-type': 'application/json',
