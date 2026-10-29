@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { requiredEnv } from './env.js';
+import { requiredEnv, requiredSecret } from './env.js';
 
-const jwtSecret = requiredEnv('JWT_SECRET');
+const jwtSecret = requiredSecret('JWT_SECRET');
 const internalToken = requiredEnv('INTERNAL_TOKEN');
 
 export class HttpError extends Error {

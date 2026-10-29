@@ -1,13 +1,10 @@
+import { requiredSecret } from '@tickethub/common/env';
+
 // Configuración leída del entorno. Falla al arrancar si falta un secreto obligatorio.
-function required(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`Falta la variable de entorno ${name}`);
-  return value;
-}
 
 export const config = {
   port: Number(process.env.PORT ?? 3001),
-  jwtSecret: required('JWT_SECRET'),
+  jwtSecret: requiredSecret('JWT_SECRET'),
   jwtExpiresIn: Number(process.env.JWT_EXPIRES_IN ?? 3600),
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7),
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS ?? 10),
