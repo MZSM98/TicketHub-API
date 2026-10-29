@@ -58,6 +58,9 @@ export const CATALOG = process.env.CATALOG_URL ?? 'http://catalog-service:3002/a
 export const INVENTORY = process.env.INVENTORY_URL ?? 'http://inventory-service:3003/api/v1';
 export const INVENTORY_SWEEP =
   process.env.INVENTORY_SWEEP_URL ?? 'http://inventory-sweep:3003/api/v1';
+export const PURCHASE = process.env.PURCHASE_URL ?? 'http://purchase-service:3004/api/v1';
+export const PURCHASE_ISOLATED =
+  process.env.PURCHASE_ISOLATED_URL ?? 'http://purchase-isolated:3004/api/v1';
 export const INVENTORY_NOCATALOG =
   process.env.INVENTORY_NOCATALOG_URL ?? 'http://inventory-nocatalog:3003/api/v1';
 export const INVENTORY_LAZY = process.env.INVENTORY_LAZY_URL ?? 'http://inventory-lazy:3003/api/v1';
