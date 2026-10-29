@@ -14,7 +14,10 @@ export const router = Router();
 const reservationId = (req) => parseId(req.params.reservationId, reservationNotFound);
 
 router.get('/internal/reservations/:reservationId', requireInternal, async (req, res) => {
-  res.json(await withReservation(reservationId(req)));
+  const id = reservationId(req);
+  const reservation = await withReservation(id);
+  const [row] = await query('SELECT purchase_id FROM reservations WHERE id = ?', [id]);
+  res.json({ ...reservation, purchaseId: row?.purchase_id ?? null });
 });
 
 router.post(

@@ -561,17 +561,19 @@ paths:
       operationId: internalGetReservation
       summary: Check a reservation before charging (internal, CU-08 verificarVigenciaReserva)
       description: |
-        **Internal** (service-to-service). PurchaseService reads status, owner, items and `total`.
-        It must reject the payment unless `status=ACTIVE` and `expiresAt` is in the future.
+        **Internal** (service-to-service). PurchaseService reads status, owner, items, `total` and
+        `purchaseId`. It must reject the payment unless `status=ACTIVE` and `expiresAt` is in the
+        future. `purchaseId` lets PurchaseService recognize a reservation CONFIRMED by its own
+        purchase (for example after a failed capture) and finish that purchase instead of undoing it.
       security:
         - internalAuth: []
       responses:
         '200':
-          description: Reservation (status already reflects expiration).
+          description: Reservation (status already reflects expiration) plus `purchaseId`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Reservation'
+                $ref: '#/components/schemas/InternalReservation'
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '404':
@@ -1007,6 +1009,19 @@ components:
           minimum: 1
         unitPrice:
           $ref: './common.yaml#/components/schemas/Money'
+    InternalReservation:
+      description: Reservation as seen by PurchaseService. Only returned by the internal endpoint.
+      allOf:
+        - $ref: '#/components/schemas/Reservation'
+        - type: object
+          required: [purchaseId]
+          properties:
+            purchaseId:
+              type: integer
+              format: int64
+              minimum: 1
+              nullable: true
+              description: Purchase that confirmed the sale (set when `status=CONFIRMED`), otherwise null.
     Reservation:
       type: object
       required: [id, userId, eventId, status, createdAt, expiresAt, secondsRemaining, total, currency, items]
