@@ -113,7 +113,7 @@ npm test   # crea el admin de .env si no existe y corre tests/ en el contenedor 
 
 Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
 
-CatalogService llama a InventoryService para publicar un evento (al menos una zona, `GET /internal/zones?eventId=`) y para borrar un DRAFT (`DELETE /internal/events/{eventId}/zones`), y a PurchaseService para las ventas del resumen CU-16 (`GET /internal/stats/sales`), que aún no existe. `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a `tests/fakes.js`: reenvía las llamadas de zonas al InventoryService real, permite simular que Inventory no responde y hace de PurchaseService falso. Al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras PurchaseService no exista, el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
+CatalogService llama a InventoryService para publicar un evento (al menos una zona, `GET /internal/zones?eventId=`) y para borrar un DRAFT (`DELETE /internal/events/{eventId}/zones`), y a PurchaseService para las ventas del resumen CU-16 (`GET /internal/stats/sales`). `npm test` recrea `catalog-service` y `purchase-service` con `docker-compose.test.yml` y los apunta a `tests/fakes.js`. El fake reenvía las llamadas de zonas y de ventas a los servicios reales, permite simular que no responden, y hace de Stripe y de TicketService falsos. Las pruebas nunca llaman al Stripe real. Al terminar regresa los servicios a la configuración normal.
 
 `docker-compose.test.yml` también levanta dos copias de InventoryService con reservas de 3 segundos (`RESERVATION_TTL_MINUTES=0.05`): `inventory-sweep`, con limpieza cada segundo, e `inventory-lazy`, sin limpieza periódica. Las pruebas de vencimiento reservan a través de ellas. `npm test` las quita al terminar. La prueba de concurrencia manda 50 reservas simultáneas por el gateway al mismo asiento y a una zona general, e imprime el resultado.
 
@@ -137,6 +137,19 @@ Zonas, asientos, disponibilidad y reservas (CU-05 a CU-07), según `contracts/in
 - Vencimiento: la reserva dura `RESERVATION_TTL_MINUTES` desde su creación y `secondsRemaining` lo calcula el servidor. Una reserva vencida se marca EXPIRED y libera sus lugares en cuanto alguien la lee o la usa, y antes de mostrar disponibilidad, mapa de asientos o crear una reserva. Además, cada `RESERVATION_SWEEP_SECONDS` (60 por omisión, 0 lo apaga) el servicio libera las vencidas. Varias instancias pueden hacerlo a la vez porque cada una toma filas distintas con `FOR UPDATE SKIP LOCKED`.
 - Toda operación que consulta a CatalogService (dueño del evento o visibilidad) responde 503 `SERVICE_UNAVAILABLE` si Catalog no responde.
 - Internos para PurchaseService: `confirm-sale` (idempotente con el mismo `purchaseId`) y `release`.
+
+## PurchaseService
+
+Compras, historial y ventas (CU-08, CU-09, CU-13), según `contracts/purchase.yaml`:
+
+- `POST /purchases` (BUYER dueño de la reserva): consulta la reserva en InventoryService, cobra el total de la reserva (nunca un monto del cliente), confirma la venta (`confirm-sale`) y pide los boletos a TicketService (`POST /internal/tickets/issue`). Solo recibe `paymentMethodToken`, nunca datos de tarjeta.
+- Pagos: el módulo `src/payments` elige el proveedor con `PAYMENT_PROVIDER`. El de Stripe llama a la API REST con `fetch` (form-encoded) usando `STRIPE_SECRET_KEY` (solo `sk_test_`; una `sk_live_` impide arrancar), `STRIPE_API_BASE` y `STRIPE_TIMEOUT_MS`.
+- Un renglón por reserva (`uq_purchases_reservation`). La compra corre en una transacción que bloquea ese renglón mientras se cobra, así que dos pagos simultáneos de la misma reserva no cobran dos veces: el segundo recibe 409 `RESERVATION_ALREADY_PAID`. Cada cobro manda `Idempotency-Key` con la reserva, el número de intento y un hash del token. Si Stripe no responde y el cliente reintenta, Stripe devuelve el mismo cargo en lugar de crear otro.
+- Rechazos: cada uno suma `failed_attempts` y responde 402 `PAYMENT_DECLINED` con `attemptsRemaining`. Al llegar a `PAYMENT_MAX_ATTEMPTS` se libera la reserva (`release`) y la respuesta es 402 `PAYMENT_ATTEMPTS_EXHAUSTED`. Si Stripe no responde: 503 `PAYMENT_GATEWAY_UNAVAILABLE`. Si responde algo inesperado: 502 `PAYMENT_GATEWAY_ERROR`. En los dos casos no cuenta como intento.
+- Si la venta no se puede confirmar después de cobrar (por ejemplo, la reserva venció durante el cobro), se reembolsa el cargo y la respuesta es 410 o 409 según el caso.
+- Si TicketService falla, la compra queda PAID con `ticketIssuance: PENDING` y se reintenta cada `TICKET_RETRY_SECONDS`. La cola está en memoria.
+
+Para probar contra Stripe en modo prueba, pon en `.env` `STRIPE_SECRET_KEY` con tu llave `sk_test_...` y `STRIPE_API_BASE=https://api.stripe.com`, levanta el stack normal (sin `docker-compose.test.yml`) y paga una reserva con `pm_card_visa` o `pm_card_chargeDeclined`.
 
 ## MinIO
 
