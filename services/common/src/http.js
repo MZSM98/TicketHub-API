@@ -207,6 +207,13 @@ export function errorHandler(err, _req, res, _next) {
     if (err.details) body.details = err.details;
     return res.status(err.status).json(body);
   }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'El cuerpo de la petición es demasiado grande',
+      details: { limit: err.limit },
+    });
+  }
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({
       code: 'VALIDATION_ERROR',
