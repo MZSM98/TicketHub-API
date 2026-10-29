@@ -74,9 +74,16 @@ function checkValue(raw, rule) {
         return { issue: 'too_long' };
       }
       if (rule.format === 'email' && !EMAIL_RE.test(value)) return { issue: 'invalid_format' };
+      if (rule.pattern && !rule.pattern.test(value)) return { issue: 'invalid_format' };
       if (rule.enum && !rule.enum.includes(value)) return { issue: 'invalid_value' };
       return { value };
     }
+    case 'integer':
+      if (typeof raw !== 'number') return { issue: 'invalid_type' };
+      if (!Number.isSafeInteger(raw)) return { issue: 'invalid_value' };
+      if (rule.minimum !== undefined && raw < rule.minimum) return { issue: 'too_small' };
+      if (rule.maximum !== undefined && raw > rule.maximum) return { issue: 'too_large' };
+      return { value: raw };
     case 'id':
       if (typeof raw !== 'number') return { issue: 'invalid_type' };
       if (!Number.isSafeInteger(raw) || raw < 1) return { issue: 'invalid_value' };

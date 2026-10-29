@@ -14,6 +14,7 @@ import {
   GATEWAY,
   IDENTITY,
   INTERNAL_TOKEN,
+  INVENTORY,
   login,
   RUN,
 } from './helpers.js';
@@ -48,6 +49,28 @@ async function upload(path, token, body) {
 
 const inDays = (days) =>
   new Date(Date.now() + days * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+
+async function addZones(token, eventId, count) {
+  for (let i = 1; i <= count; i++) {
+    await expectContract(
+      'POST',
+      `/events/${eventId}/zones`,
+      201,
+      { token, body: { name: `Zona ${i}`, type: 'GENERAL', price: '100.00', capacity: 100 } },
+      '/events/{eventId}/zones',
+    );
+  }
+  assert.equal((await zonesOf(eventId)).length, count);
+}
+
+async function zonesOf(eventId) {
+  const { res, body } = await call('GET', `/internal/zones?eventId=${eventId}`, {
+    base: INVENTORY,
+    headers: internal,
+  });
+  assert.equal(res.status, 200, JSON.stringify(body));
+  return body;
+}
 
 function assertError(res, body, status, code) {
   assert.equal(res.status, status, JSON.stringify(body));
@@ -346,9 +369,9 @@ describe('CatalogService (catalog.yaml)', () => {
         fakes.inventoryUp = true;
       }
 
-      fakes.zonesByEvent.set(s.event.id, 2);
-      fakes.zonesByEvent.set(s.event2.id, 1);
-      fakes.zonesByEvent.set(s.eventB.id, 1);
+      await addZones(token, s.event.id, 2);
+      await addZones(token, s.event2.id, 1);
+      await addZones(s.orgB.token, s.eventB.id, 1);
       const published = await expectContract('PATCH', path, 200, publish, ev('/status'));
       assert.equal(published.status, 'PUBLISHED');
       s.event = published;
@@ -475,7 +498,7 @@ describe('CatalogService (catalog.yaml)', () => {
         ev(),
       );
       assert.deepEqual(conflict.details, { status: 'PUBLISHED' });
-      fakes.zonesByEvent.set(s.draft.id, 2);
+      await addZones(token, s.draft.id, 2);
       fakes.inventoryUp = false;
       try {
         const down = await expectContract('DELETE', `/events/${s.draft.id}`, 503, { token }, ev());
@@ -488,7 +511,7 @@ describe('CatalogService (catalog.yaml)', () => {
 
       await expectContract('DELETE', `/events/${s.draft.id}`, 204, { token }, ev());
       assert.equal(fakes.deletedZones.includes(s.draft.id), true);
-      assert.equal(fakes.zonesByEvent.has(s.draft.id), false);
+      assert.deepEqual(await zonesOf(s.draft.id), []);
       await expectContract('DELETE', `/events/${s.draft.id}`, 404, { token }, ev());
       assert.equal(fakes.deletedZones.filter((id) => id === s.draft.id).length, 1);
     });

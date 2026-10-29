@@ -55,6 +55,12 @@ export const login = (mail, password) =>
   expectContract('POST', '/auth/login', 200, { body: { email: mail, password } });
 
 export const CATALOG = process.env.CATALOG_URL ?? 'http://catalog-service:3002/api/v1';
+export const INVENTORY = process.env.INVENTORY_URL ?? 'http://inventory-service:3003/api/v1';
+export const INVENTORY_SWEEP =
+  process.env.INVENTORY_SWEEP_URL ?? 'http://inventory-sweep:3003/api/v1';
+export const INVENTORY_NOCATALOG =
+  process.env.INVENTORY_NOCATALOG_URL ?? 'http://inventory-nocatalog:3003/api/v1';
+export const INVENTORY_LAZY = process.env.INVENTORY_LAZY_URL ?? 'http://inventory-lazy:3003/api/v1';
 
 async function accountWithSession(path, token, body) {
   const created = await expectContract('POST', path, 201, { token, body });

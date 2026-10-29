@@ -9171,7 +9171,7 @@
         ],
         "operationId": "getZoneSeatMap",
         "summary": "Seat map of a NUMBERED zone (CU-05)",
-        "description": "**Role:** public. Clients draw RESERVED and SOLD seats as not selectable. For a GENERAL zone\nthe API returns 409 `ZONE_NOT_NUMBERED`.\n",
+        "description": "**Role:** public. Clients draw RESERVED and SOLD seats as not selectable. For a GENERAL zone\nthe API returns 409 `ZONE_NOT_NUMBERED`. Same visibility as the event availability (checked\nwith CatalogService): a zone of a DRAFT event answers 404 `ZONE_NOT_FOUND`, a zone of a\nCANCELLED or already started event answers 410 `EVENT_NOT_AVAILABLE`, and 503 when\nCatalogService is not reachable.\n",
         "security": [],
         "responses": {
           "200": {
@@ -9379,6 +9379,92 @@
                 "example": {
                   "code": "ZONE_NOT_NUMBERED",
                   "message": "La zona es general y no tiene asientos numerados"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The event is CANCELLED or already started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "EVENT_NOT_AVAILABLE",
+                  "message": "El evento ya no está disponible"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A downstream service is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }
@@ -9779,6 +9865,49 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "A downstream service is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9808,7 +9937,7 @@
         ],
         "operationId": "listEventZones",
         "summary": "List zones of my event with counters (CU-12)",
-        "description": "**Role:** ORGANIZER (owner), ADMIN. Includes raw `reservedCount` and `soldCount`.",
+        "description": "**Role:** ORGANIZER (owner), ADMIN. Includes raw `reservedCount` and `soldCount`. Ownership is checked with CatalogService; 503 when it is not reachable.",
         "responses": {
           "200": {
             "description": "Zones.",
@@ -10018,6 +10147,49 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A downstream service is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }
@@ -10764,7 +10936,75 @@
             }
           },
           "409": {
-            "description": "Type change, or capacity below what is already reserved or sold.",
+            "description": "`ZONE_TYPE_CHANGE` when `type` differs from the current one (details carry the current\ntype), `CAPACITY_BELOW_COMMITTED` when `capacity` is below what is already reserved or\nsold, or `ZONE_HAS_SALES` when the capacity of a NUMBERED zone changes while it has\nreservations or sales (without them the seat layout is deleted and must be generated again).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "typeChange": {
+                    "summary": "The zone type cannot change",
+                    "value": {
+                      "code": "ZONE_TYPE_CHANGE",
+                      "message": "El tipo de la zona no se puede cambiar",
+                      "details": {
+                        "type": "NUMBERED"
+                      }
+                    }
+                  },
+                  "capacityBelowCommitted": {
+                    "summary": "Capacity below reserved plus sold",
+                    "value": {
+                      "code": "CAPACITY_BELOW_COMMITTED",
+                      "message": "La capacidad no puede ser menor a los boletos reservados o vendidos",
+                      "details": {
+                        "committed": 140
+                      }
+                    }
+                  },
+                  "hasSales": {
+                    "summary": "NUMBERED zone resized while it has reservations or sales",
+                    "value": {
+                      "code": "ZONE_HAS_SALES",
+                      "message": "La zona ya tiene asientos reservados o vendidos"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A downstream service is not reachable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10800,11 +11040,8 @@
                   }
                 },
                 "example": {
-                  "code": "CAPACITY_BELOW_COMMITTED",
-                  "message": "La capacidad no puede ser menor a los boletos reservados o vendidos",
-                  "details": {
-                    "committed": 140
-                  }
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }
@@ -11008,6 +11245,49 @@
                 "example": {
                   "code": "ZONE_HAS_SALES",
                   "message": "La zona ya tiene asientos reservados o vendidos"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A downstream service is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }
@@ -11609,6 +11889,49 @@
                 "example": {
                   "code": "RESERVATION_FAILED",
                   "message": "Error al procesar reserva"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A downstream service is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Servicio temporalmente inactivo"
                 }
               }
             }

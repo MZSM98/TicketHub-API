@@ -113,7 +113,9 @@ npm test   # crea el admin de .env si no existe y corre tests/ en el contenedor 
 
 Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
 
-CatalogService depende de dos servicios que aún no existen: InventoryService (publicar un evento requiere al menos una zona, `GET /internal/zones?eventId=`, y borrar un evento DRAFT borra antes sus zonas, `DELETE /internal/events/{eventId}/zones`) y PurchaseService (ventas del resumen CU-16, `GET /internal/stats/sales`). Para probarlo, `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a un Inventory y un Purchase falsos que levanta la suite (`tests/fakes.js`), y al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras esos servicios no estén implementados, publicar o borrar un evento responde 503 y el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
+CatalogService llama a InventoryService para publicar un evento (al menos una zona, `GET /internal/zones?eventId=`) y para borrar un DRAFT (`DELETE /internal/events/{eventId}/zones`), y a PurchaseService para las ventas del resumen CU-16 (`GET /internal/stats/sales`), que aún no existe. `npm test` recrea `catalog-service` con `docker-compose.test.yml`, que lo apunta a `tests/fakes.js`: reenvía las llamadas de zonas al InventoryService real, permite simular que Inventory no responde y hace de PurchaseService falso. Al terminar lo regresa a la configuración normal. Fuera de las pruebas, mientras PurchaseService no exista, el resumen trae `sales: null` con `"sales"` en `unavailableSections`.
+
+`docker-compose.test.yml` también levanta dos copias de InventoryService con reservas de 3 segundos (`RESERVATION_TTL_MINUTES=0.05`): `inventory-sweep`, con limpieza cada segundo, e `inventory-lazy`, sin limpieza periódica. Las pruebas de vencimiento reservan a través de ellas. `npm test` las quita al terminar. La prueba de concurrencia manda 50 reservas simultáneas por el gateway al mismo asiento y a una zona general, e imprime el resultado.
 
 ## CatalogService
 
@@ -124,6 +126,17 @@ Recintos, eventos, personal asignado a eventos y el resumen global (CU-03, CU-04
 - Personal: el organizador solo asigna usuarios STAFF activos con `employerId` igual a él (se consulta IdentityService); asignar dos veces responde 200.
 - Borrar un evento DRAFT borra primero sus zonas en InventoryService. Si Inventory no responde, el evento no se borra y la respuesta es 503, para no dejar zonas sin evento; se puede reintentar.
 - Póster: JPG o PNG de hasta 5 MB en `multipart/form-data` (campo `file`). El tipo se revisa por los primeros bytes del archivo, no por el nombre. Se guarda en MinIO, en el bucket `MINIO_BUCKET_POSTERS`, y MySQL guarda solo `poster_key`. Al reemplazarlo o borrar el evento se borra el archivo anterior. Un evento CANCELLED no acepta póster nuevo (409 `INVALID_EVENT_STATE`). `GET /events/{eventId}/poster` sigue las mismas reglas de visibilidad que el evento (404 DRAFT, 410 CANCELLED) y responde 503 si MinIO no responde.
+
+## InventoryService
+
+Zonas, asientos, disponibilidad y reservas (CU-05 a CU-07), según `contracts/inventory.yaml`:
+
+- Zonas: el organizador dueño del evento las crea, edita y borra (se consulta CatalogService en `/internal/events/{id}`). El precio es por zona. El tipo (NUMBERED o GENERAL) no cambia después de crear la zona (409 `ZONE_TYPE_CHANGE`). La capacidad no baja de lo reservado más lo vendido (409 `CAPACITY_BELOW_COMMITTED`). Una zona con reservas o ventas no se borra ni regenera su plano (409 `ZONE_HAS_SALES`). Cambiar la capacidad de una zona NUMBERED sin reservas borra sus asientos, y hay que volver a generar el plano. En un evento CANCELLED no se crean ni editan zonas.
+- Asientos: `GET /zones/{zoneId}/seats` es público con la misma visibilidad que la disponibilidad: 404 `ZONE_NOT_FOUND` si el evento es DRAFT y 410 `EVENT_NOT_AVAILABLE` si está CANCELLED o ya empezó. `POST /zones/{zoneId}/seats` reemplaza el plano completo. La suma de `seatCount` debe ser igual a la capacidad (400 `SEAT_COUNT_MISMATCH`).
+- Reservas: solo BUYER, hasta `MAX_TICKETS_PER_RESERVATION` boletos (400 `TOO_MANY_TICKETS`), una reserva ACTIVE por comprador (la garantiza el índice único `uq_reservations_active_user`), todo o nada. En una transacción se bloquean los asientos con `SELECT ... FOR UPDATE` y las zonas generales se descuentan con un `UPDATE` condicionado a la capacidad, así que dos compradores no obtienen el mismo asiento ni una zona se sobrevende (`ck_zones_no_oversell` es la última barrera). Cada renglón guarda su `unit_price` y la reserva confirmada guarda `purchase_id`.
+- Vencimiento: la reserva dura `RESERVATION_TTL_MINUTES` desde su creación y `secondsRemaining` lo calcula el servidor. Una reserva vencida se marca EXPIRED y libera sus lugares en cuanto alguien la lee o la usa, y antes de mostrar disponibilidad, mapa de asientos o crear una reserva. Además, cada `RESERVATION_SWEEP_SECONDS` (60 por omisión, 0 lo apaga) el servicio libera las vencidas. Varias instancias pueden hacerlo a la vez porque cada una toma filas distintas con `FOR UPDATE SKIP LOCKED`.
+- Toda operación que consulta a CatalogService (dueño del evento o visibilidad) responde 503 `SERVICE_UNAVAILABLE` si Catalog no responde.
+- Internos para PurchaseService: `confirm-sale` (idempotente con el mismo `purchaseId`) y `release`.
 
 ## MinIO
 

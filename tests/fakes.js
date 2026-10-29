@@ -1,7 +1,9 @@
 import http from 'node:http';
+import { INVENTORY } from './helpers.js';
+
+const INVENTORY_ORIGIN = new URL(INVENTORY).origin;
 
 export const fakes = {
-  zonesByEvent: new Map(),
   inventoryUp: true,
   sales: { purchases: 3, grossRevenue: '4500.00', currency: 'MXN' },
   salesUp: true,
@@ -14,38 +16,30 @@ function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+async function proxyToInventory(req, res, url) {
+  const upstream = await fetch(`${INVENTORY_ORIGIN}${url.pathname}${url.search}`, {
+    method: req.method,
+    headers: { 'x-internal-token': req.headers['x-internal-token'] },
+  });
+  const text = await upstream.text();
+  res.writeHead(upstream.status, text ? { 'content-type': 'application/json' } : {});
+  res.end(text);
+  return upstream.status;
+}
+
 export function startFakes(port, internalToken) {
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://fakes');
     fakes.tokens.push(req.headers['x-internal-token']);
     if (req.headers['x-internal-token'] !== internalToken) {
       return send(res, 401, { code: 'UNAUTHORIZED', message: 'Token interno inválido' });
     }
     const zonesOfEvent = /^\/api\/v1\/internal\/events\/(\d+)\/zones$/.exec(url.pathname);
-    if (req.method === 'DELETE' && zonesOfEvent) {
+    if ((req.method === 'DELETE' && zonesOfEvent) || url.pathname === '/api/v1/internal/zones') {
       if (!fakes.inventoryUp) return send(res, 500, { code: 'INTERNAL_ERROR', message: 'x' });
-      const eventId = Number(zonesOfEvent[1]);
-      fakes.zonesByEvent.delete(eventId);
-      fakes.deletedZones.push(eventId);
-      res.writeHead(204);
-      return res.end();
-    }
-    if (url.pathname === '/api/v1/internal/zones') {
-      if (!fakes.inventoryUp) return send(res, 500, { code: 'INTERNAL_ERROR', message: 'x' });
-      const eventId = Number(url.searchParams.get('eventId'));
-      const count = fakes.zonesByEvent.get(eventId) ?? 0;
-      const zones = Array.from({ length: count }, (_, i) => ({
-        id: i + 1,
-        eventId,
-        name: `Zona ${i + 1}`,
-        type: 'GENERAL',
-        price: '100.00',
-        currency: 'MXN',
-        capacity: 100,
-        reservedCount: 0,
-        soldCount: 0,
-      }));
-      return send(res, 200, zones);
+      const status = await proxyToInventory(req, res, url);
+      if (zonesOfEvent && status === 204) fakes.deletedZones.push(Number(zonesOfEvent[1]));
+      return;
     }
     if (url.pathname === '/api/v1/internal/stats/sales') {
       if (!fakes.salesUp) return send(res, 503, { code: 'SERVICE_UNAVAILABLE', message: 'x' });

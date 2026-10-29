@@ -93,7 +93,10 @@ paths:
       summary: Seat map of a NUMBERED zone (CU-05)
       description: |
         **Role:** public. Clients draw RESERVED and SOLD seats as not selectable. For a GENERAL zone
-        the API returns 409 `ZONE_NOT_NUMBERED`.
+        the API returns 409 `ZONE_NOT_NUMBERED`. Same visibility as the event availability (checked
+        with CatalogService): a zone of a DRAFT event answers 404 `ZONE_NOT_FOUND`, a zone of a
+        CANCELLED or already started event answers 410 `EVENT_NOT_AVAILABLE`, and 503 when
+        CatalogService is not reachable.
       security: []
       responses:
         '200':
@@ -124,6 +127,10 @@ paths:
           $ref: '#/components/responses/ZoneNotFound'
         '409':
           $ref: '#/components/responses/ZoneNotNumbered'
+        '410':
+          $ref: '#/components/responses/EventNotAvailable'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
     post:
       tags: [Zones]
       operationId: generateZoneSeats
@@ -183,6 +190,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
   /events/{eventId}/zones:
     parameters:
@@ -191,7 +200,7 @@ paths:
       tags: [Zones]
       operationId: listEventZones
       summary: List zones of my event with counters (CU-12)
-      description: '**Role:** ORGANIZER (owner), ADMIN. Includes raw `reservedCount` and `soldCount`.'
+      description: '**Role:** ORGANIZER (owner), ADMIN. Includes raw `reservedCount` and `soldCount`. Ownership is checked with CatalogService; 503 when it is not reachable.'
       responses:
         '200':
           description: Zones.
@@ -207,6 +216,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
     post:
       tags: [Zones]
       operationId: createZone
@@ -278,16 +289,37 @@ paths:
         '404':
           $ref: '#/components/responses/ZoneNotFound'
         '409':
-          description: Type change, or capacity below what is already reserved or sold.
+          description: |
+            `ZONE_TYPE_CHANGE` when `type` differs from the current one (details carry the current
+            type), `CAPACITY_BELOW_COMMITTED` when `capacity` is below what is already reserved or
+            sold, or `ZONE_HAS_SALES` when the capacity of a NUMBERED zone changes while it has
+            reservations or sales (without them the seat layout is deleted and must be generated again).
           content:
             application/json:
               schema:
                 $ref: './common.yaml#/components/schemas/Error'
-              example:
-                code: CAPACITY_BELOW_COMMITTED
-                message: La capacidad no puede ser menor a los boletos reservados o vendidos
-                details:
-                  committed: 140
+              examples:
+                typeChange:
+                  summary: The zone type cannot change
+                  value:
+                    code: ZONE_TYPE_CHANGE
+                    message: El tipo de la zona no se puede cambiar
+                    details:
+                      type: NUMBERED
+                capacityBelowCommitted:
+                  summary: Capacity below reserved plus sold
+                  value:
+                    code: CAPACITY_BELOW_COMMITTED
+                    message: La capacidad no puede ser menor a los boletos reservados o vendidos
+                    details:
+                      committed: 140
+                hasSales:
+                  summary: NUMBERED zone resized while it has reservations or sales
+                  value:
+                    code: ZONE_HAS_SALES
+                    message: La zona ya tiene asientos reservados o vendidos
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
     delete:
       tags: [Zones]
       operationId: deleteZone
@@ -311,6 +343,8 @@ paths:
               example:
                 code: ZONE_HAS_SALES
                 message: La zona ya tiene asientos reservados o vendidos
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
   /reservations:
     post:
@@ -432,6 +466,8 @@ paths:
               example:
                 code: RESERVATION_FAILED
                 message: Error al procesar reserva
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
   /reservations/active:
     get:
