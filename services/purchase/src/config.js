@@ -10,12 +10,20 @@ function positiveNumber(name, fallback) {
   return value;
 }
 
+function atLeastOne(name, fallback) {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} debe ser un entero mayor o igual a 1`);
+  }
+  return value;
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 3004),
   internalToken: required('INTERNAL_TOKEN'),
   internalTimeoutMs: positiveNumber('INTERNAL_TIMEOUT_MS', 3000),
   paymentProvider: process.env.PAYMENT_PROVIDER ?? 'stripe',
-  paymentMaxAttempts: positiveNumber('PAYMENT_MAX_ATTEMPTS', 3),
+  paymentMaxAttempts: atLeastOne('PAYMENT_MAX_ATTEMPTS', 3),
   ticketRetryMs: positiveNumber('TICKET_RETRY_SECONDS', 30) * 1000,
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY ?? '',
