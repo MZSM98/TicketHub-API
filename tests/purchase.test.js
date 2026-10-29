@@ -15,6 +15,7 @@ import {
   login,
   PURCHASE,
   PURCHASE_ISOLATED,
+  PURCHASE_SHORTCLAIM,
   RUN,
 } from './helpers.js';
 
@@ -130,7 +131,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     );
     s.buyers = [];
     s.buyerIds = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 19; i++) {
       const account = { name: `Comprador ${i}`, email: email(`pur-${i}`), password: 'S3gura!2026' };
       s.buyerIds.push((await expectContract('POST', '/auth/register', 201, { body: account })).id);
       s.buyers.push((await login(account.email, account.password)).accessToken);
@@ -357,6 +358,7 @@ describe('PurchaseService (purchase.yaml)', () => {
       fakes.stripe.delayMs = 0;
     }
     assert.equal(chargesOf(reservation.id).length, 1, 'Stripe sí registró la autorización');
+    await sleep(Math.max(0, 2700 - (Date.now() - started)));
     const replaysBefore = fakes.stripe.replays;
     const retry = await pay(token, reservation.id, 'pm_card_visa', 201);
     assert.equal(retry.purchase.paymentReference, chargesOf(reservation.id)[0].id);
@@ -499,11 +501,19 @@ describe('PurchaseService (purchase.yaml)', () => {
     const timeout = await pay(token, reservation.id, 'pm_delay3000', 503);
     assert.equal(timeout.code, 'PAYMENT_GATEWAY_UNAVAILABLE');
     assert.ok(Date.now() - started < 2500, 'respondió por timeout');
+    const inUseBefore = fakes.stripe.inUse ?? 0;
+    const busy = await pay(token, reservation.id, 'pm_card_visa', 503);
+    assert.equal(busy.code, 'PAYMENT_GATEWAY_UNAVAILABLE');
+    assert.equal(
+      fakes.stripe.inUse,
+      inUseBefore + 1,
+      'Stripe respondió 409 idempotency_key_in_use',
+    );
+    await sleep(Math.max(0, 3200 - (Date.now() - started)));
     const retry = await pay(token, reservation.id, 'pm_card_visa', 201);
     const [slow] = chargesOf(reservation.id);
     assert.equal(slow.paymentMethod, 'pm_delay3000');
     assert.equal(retry.purchase.paymentReference, slow.id);
-    await sleep(Math.max(0, 3200 - (Date.now() - started)));
     assert.equal(chargesOf(reservation.id).length, 1);
     assert.equal(netChargesOf(reservation.id).length, 1);
     assert.equal(orphansOf(reservation.id).length, 0);
@@ -511,7 +521,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.ok(requests.every((r) => r.params.payment_method === 'pm_delay3000'));
     assert.equal(new Set(requests.map((r) => r.idempotencyKey)).size, 1);
     console.log(
-      `[timeout + otra tarjeta] solicitudes=${requests.length} autorizaciones=${chargesOf(reservation.id).length} cargos netos=${netChargesOf(reservation.id).length} huérfanas=${orphansOf(reservation.id).length}`,
+      `[timeout + otra tarjeta] 409 en uso=1 solicitudes=${requests.length} autorizaciones=${chargesOf(reservation.id).length} cargos netos=${netChargesOf(reservation.id).length} huérfanas=${orphansOf(reservation.id).length}`,
     );
     s.paid.push(retry.purchase);
   });
@@ -625,6 +635,182 @@ describe('PurchaseService (purchase.yaml)', () => {
     console.log(
       `[precio cambiado] General ${general(before).price} -> ${general(after).price}; revenue ${general(after).revenue}; grossRevenue ${after.grossRevenue}`,
     );
+  });
+
+  const seatStatus = async (seatId) => {
+    const map = await expectContract(
+      'GET',
+      `/zones/${s.platea.id}/seats`,
+      200,
+      {},
+      '/zones/{zoneId}/seats',
+    );
+    return map.rows[0].seats.find((x) => x.id === seatId).status;
+  };
+  const requestsTo = (suffix, charge) =>
+    fakes.stripe.requests.filter((r) => r.path === `/v1/payment_intents/${charge.id}/${suffix}`)
+      .length;
+  const refundsOf = (charge) => fakes.stripe.refunds.filter((id) => id === charge.id).length;
+
+  test('captura falla una vez y el reintento la recupera: PAID, 1 cargo neto, asiento SOLD', async () => {
+    const token = s.buyers[10];
+    const reservation = await reserve(token, [seat(10)]);
+    fakes.stripe.captureFailures.set(reservation.id, { mode: '503', times: 1 });
+    const failed = await pay(token, reservation.id, 'pm_card_visa', 503);
+    assert.equal(failed.code, 'PAYMENT_GATEWAY_UNAVAILABLE');
+    const confirmed = await internalReservation(reservation.id);
+    assert.equal(confirmed.status, 'CONFIRMED');
+    assert.equal(typeof confirmed.purchaseId, 'number');
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.status, 'PAID');
+    assert.equal(ok.purchase.id, confirmed.purchaseId);
+    const [charge] = chargesOf(reservation.id);
+    assert.equal(netChargesOf(reservation.id).length, 1);
+    assert.equal(chargesOf(reservation.id).length, 1);
+    assert.equal(
+      requestsTo('cancel', charge) + refundsOf(charge),
+      0,
+      'ni cancelación ni reembolso',
+    );
+    assert.equal(await seatStatus(s.seats[10]), 'SOLD');
+    const again = await pay(token, reservation.id, 'pm_card_visa', 409);
+    assert.deepEqual(again.details, { purchaseId: ok.purchase.id });
+    console.log(
+      `[captura 503 una vez] recuperada por el reintento; capturas=${requestsTo('capture', charge)}`,
+    );
+  });
+
+  test('el servicio pierde la respuesta de la captura (Stripe sí capturó): el barrido deja la compra PAID sin reembolso', async () => {
+    const token = s.buyers[11];
+    const reservation = await reserve(token, [seat(11)]);
+    fakes.stripe.captureFailures.set(reservation.id, { mode: 'drop', times: 1 });
+    await pay(token, reservation.id, 'pm_card_visa', 503);
+    const [charge] = chargesOf(reservation.id);
+    assert.equal(charge.status, 'succeeded', 'Stripe capturó');
+    const isPaid = async () =>
+      (await expectContract('GET', '/purchases/me', 200, { token })).items[0]?.status === 'PAID';
+    const started = Date.now();
+    while (!(await isPaid()) && Date.now() - started < 15000) await sleep(300);
+    assert.ok(await isPaid(), 'el barrido concilió a PAID');
+    assert.equal(netChargesOf(reservation.id).length, 1);
+    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0);
+    assert.equal(await seatStatus(s.seats[11]), 'SOLD');
+
+    console.log(
+      `[captura perdida] PAID por el barrido en ${Date.now() - started} ms, sin reembolso`,
+    );
+  });
+
+  test('la captura falla siempre: nunca SOLD + reembolso; rechazo definitivo queda CAPTURE_FAILED (502) para revisión', async () => {
+    const token = s.buyers[12];
+    const reservation = await reserve(token, [seat(12)]);
+    fakes.stripe.captureFailures.set(reservation.id, { mode: '503', times: Infinity });
+    const first = await pay(token, reservation.id, 'pm_card_visa', 503);
+    assert.equal(first.code, 'PAYMENT_GATEWAY_UNAVAILABLE');
+    const [charge] = chargesOf(reservation.id);
+    assert.ok(
+      await waitFor(() => requestsTo('capture', charge) >= 3, 15000),
+      'el barrido reintenta',
+    );
+    assert.equal(charge.status, 'requires_capture');
+    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0);
+    assert.equal(await seatStatus(s.seats[12]), 'SOLD');
+    fakes.stripe.captureFailures.set(reservation.id, { mode: '400', times: Infinity });
+    const definitive = await pay(token, reservation.id, 'pm_card_visa', 502);
+    assert.equal(definitive.code, 'PAYMENT_GATEWAY_ERROR');
+    const captures = requestsTo('capture', charge);
+    await sleep(6000);
+    assert.equal(requestsTo('capture', charge), captures, 'CAPTURE_FAILED ya no se reintenta');
+    const after = await pay(token, reservation.id, 'pm_card_visa', 502);
+    assert.equal(after.code, 'PAYMENT_GATEWAY_ERROR');
+    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0, 'nunca se deshace');
+    assert.equal(netChargesOf(reservation.id).length, 0);
+    assert.equal(await seatStatus(s.seats[12]), 'SOLD');
+    const mine = await expectContract('GET', '/purchases/me', 200, { token });
+    assert.equal(mine.totalItems, 0);
+    fakes.stripe.captureFailures.delete(reservation.id);
+    console.log(
+      `[captura siempre falla] capturas=${requestsTo('capture', charge)} cancelaciones=0 reembolsos=0 asiento=SOLD compra no PAID`,
+    );
+  });
+
+  test('400 idempotency_error: el intento queda FAILED, no se reintenta y el siguiente pago usa el intento 2', async () => {
+    const token = s.buyers[13];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    fakes.stripe.idempotencyErrorFor.add(reservation.id);
+    const failed = await pay(token, reservation.id, 'pm_card_visa', 502);
+    assert.equal(failed.code, 'PAYMENT_GATEWAY_ERROR');
+    fakes.stripe.idempotencyErrorFor.delete(reservation.id);
+    const key1 = `tickethub-reservation-${reservation.id}-attempt-1`;
+    await sleep(6000);
+    assert.equal(
+      intentRequestsOf(reservation.id).filter((r) => r.idempotencyKey === key1).length,
+      1,
+      'el barrido no lo reintentó',
+    );
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.failedAttempts, 0);
+    assert.deepEqual(
+      intentRequestsOf(reservation.id).map((r) => r.idempotencyKey),
+      [key1, `tickethub-reservation-${reservation.id}-attempt-2`],
+    );
+    assert.equal(netChargesOf(reservation.id).length, 1);
+  });
+
+  test('reclamo vencido: la escritura del proceso que lo perdió se rechaza y el rechazo cuenta una sola vez', async () => {
+    const token = s.buyers[14];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    fakes.stripe.delayMs = 1300;
+    let stale;
+    try {
+      stale = await pay(token, reservation.id, 'pm_card_chargeDeclined', 503, PURCHASE_SHORTCLAIM);
+    } finally {
+      fakes.stripe.delayMs = 0;
+    }
+    assert.equal(stale.code, 'PAYMENT_GATEWAY_UNAVAILABLE', 'su escritura fue rechazada');
+    const key1 = `tickethub-reservation-${reservation.id}-attempt-1`;
+    assert.ok(
+      await waitFor(
+        () => intentRequestsOf(reservation.id).filter((r) => r.idempotencyKey === key1).length >= 2,
+      ),
+      'el barrido concilió el intento',
+    );
+    await sleep(500);
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.failedAttempts, 1, 'el rechazo se contó una sola vez');
+    console.log(
+      `[reclamo vencido] respuesta del proceso viejo 503; failedAttempts=${ok.purchase.failedAttempts}`,
+    );
+  });
+
+  test('boletos: fallas permanentes no acaparan el reintento (lote 2, backoff exponencial)', async () => {
+    fakes.tickets.up = false;
+    const stuck = [];
+    try {
+      for (const i of [15, 16, 17]) {
+        const r = await reserve(s.buyers[i], [{ zoneId: s.general.id, quantity: 1 }]);
+        const result = await pay(s.buyers[i], r.id, 'pm_card_visa', 201);
+        assert.equal(result.ticketIssuance, 'PENDING');
+        stuck.push(result.purchase.id);
+        fakes.tickets.failFor.add(result.purchase.id);
+      }
+      const r = await reserve(s.buyers[18], [{ zoneId: s.general.id, quantity: 1 }]);
+      const late = await pay(s.buyers[18], r.id, 'pm_card_visa', 201);
+      assert.equal(late.ticketIssuance, 'PENDING');
+      fakes.tickets.up = true;
+      const started = Date.now();
+      assert.ok(
+        await waitFor(() => fakes.tickets.issued.has(late.purchase.id), 20000),
+        'la compra nueva se emitió pese a 3 fallas permanentes anteriores',
+      );
+      const stuckCalls = fakes.tickets.calls.filter((c) => stuck.includes(c.purchaseId)).length;
+      console.log(
+        `[boletos sin inanición] emitida en ${Date.now() - started} ms; llamadas a compras atascadas=${stuckCalls}`,
+      );
+    } finally {
+      fakes.tickets.up = true;
+      for (const id of stuck) fakes.tickets.failFor.delete(id);
+    }
   });
 
   test('GET /internal/stats/sales: totales de compras PAID; sin token 401; no pasa por el gateway', async () => {

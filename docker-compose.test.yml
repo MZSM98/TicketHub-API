@@ -25,6 +25,7 @@ services:
       TICKET_RETRY_SECONDS: '0'
       PAYMENT_SWEEP_SECONDS: '1'
       PAYMENT_RECONCILE_AFTER_SECONDS: '4'
+      TICKET_RETRY_BACKOFF_SECONDS: '1'
 
   purchase-isolated:
     extends: { file: docker-compose.yml, service: purchase-service }
@@ -35,7 +36,21 @@ services:
       CATALOG_SERVICE_URL: http://catalog-down.invalid:3002
       TICKET_SERVICE_URL: http://tests:4100
       TICKET_RETRY_SECONDS: '1'
+      TICKET_RETRY_BACKOFF_SECONDS: '1'
+      TICKET_RETRY_MAX_SECONDS: '8'
+      TICKET_RETRY_BATCH: '2'
       PAYMENT_SWEEP_SECONDS: '0'
+
+  purchase-shortclaim:
+    extends: { file: docker-compose.yml, service: purchase-service }
+    environment:
+      STRIPE_API_BASE: http://tests:4100
+      STRIPE_SECRET_KEY: sk_test_fake_tickethub
+      STRIPE_TIMEOUT_MS: '1500'
+      TICKET_SERVICE_URL: http://tests:4100
+      TICKET_RETRY_SECONDS: '0'
+      PAYMENT_SWEEP_SECONDS: '0'
+      PAYMENT_CLAIM_SECONDS: '1'
 
   inventory-sweep:
     extends: { file: docker-compose.yml, service: inventory-service }
@@ -62,6 +77,7 @@ services:
       INVENTORY_NOCATALOG_URL: http://inventory-nocatalog:3003/api/v1
       PURCHASE_URL: http://purchase-service:3004/api/v1
       PURCHASE_ISOLATED_URL: http://purchase-isolated:3004/api/v1
+      PURCHASE_SHORTCLAIM_URL: http://purchase-shortclaim:3004/api/v1
     depends_on:
       inventory-service: { condition: service_healthy }
       inventory-sweep: { condition: service_healthy }
@@ -69,3 +85,4 @@ services:
       inventory-nocatalog: { condition: service_healthy }
       purchase-service: { condition: service_healthy }
       purchase-isolated: { condition: service_healthy }
+      purchase-shortclaim: { condition: service_healthy }

@@ -61,6 +61,8 @@ export const INVENTORY_SWEEP =
 export const PURCHASE = process.env.PURCHASE_URL ?? 'http://purchase-service:3004/api/v1';
 export const PURCHASE_ISOLATED =
   process.env.PURCHASE_ISOLATED_URL ?? 'http://purchase-isolated:3004/api/v1';
+export const PURCHASE_SHORTCLAIM =
+  process.env.PURCHASE_SHORTCLAIM_URL ?? 'http://purchase-shortclaim:3004/api/v1';
 export const INVENTORY_NOCATALOG =
   process.env.INVENTORY_NOCATALOG_URL ?? 'http://inventory-nocatalog:3003/api/v1';
 export const INVENTORY_LAZY = process.env.INVENTORY_LAZY_URL ?? 'http://inventory-lazy:3003/api/v1';
