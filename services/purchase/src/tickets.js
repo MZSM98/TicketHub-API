@@ -22,6 +22,18 @@ async function payloadOf(purchaseId) {
   };
 }
 
+const baseSeconds = () => Math.max(1, config.ticketRetryMs / 1000 || 30);
+
+async function scheduleRetry(purchaseId) {
+  await query(
+    `UPDATE purchases
+        SET ticket_attempts = ticket_attempts + 1,
+            ticket_next_retry_at = DATE_ADD(NOW(3), INTERVAL LEAST(? * POW(2, ticket_attempts), ?) SECOND)
+      WHERE id = ? AND ticket_issuance = 'PENDING'`,
+    [baseSeconds(), config.ticketRetryMaxSeconds, purchaseId],
+  );
+}
+
 export async function issueFor(purchaseId) {
   try {
     const ticketIds = await issueTickets(await payloadOf(purchaseId));
@@ -32,6 +44,7 @@ export async function issueFor(purchaseId) {
     return { ticketIssuance: 'ISSUED', ticketIds };
   } catch (err) {
     console.error(`Emisión de boletos de la compra ${purchaseId} pendiente: ${err.message}`);
+    await scheduleRetry(purchaseId).catch(() => null);
     return { ticketIssuance: 'PENDING', ticketIds: [] };
   }
 }
@@ -42,7 +55,9 @@ export async function retryPendingTickets() {
   retrying = true;
   try {
     const rows = await query(
-      "SELECT id FROM purchases WHERE status = 'PAID' AND ticket_issuance = 'PENDING' ORDER BY id LIMIT 50",
+      `SELECT id FROM purchases
+        WHERE status = 'PAID' AND ticket_issuance = 'PENDING' AND ticket_next_retry_at <= NOW(3)
+        ORDER BY ticket_next_retry_at, id LIMIT ${config.ticketRetryBatch}`,
     );
     for (const { id } of rows) await issueFor(id);
   } catch (err) {

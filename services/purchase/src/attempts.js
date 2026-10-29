@@ -209,7 +209,7 @@ export async function completePurchase(claim, attempt, items) {
     await updateAttempt(claim, attempt.id, "a.status = 'CAPTURED', a.last_error = NULL", [], conn);
     const result = await query(
       `UPDATE purchases SET status = 'PAID', payment_provider = ?, payment_reference = ?,
-         ticket_issuance = 'PENDING'
+         ticket_issuance = 'PENDING', ticket_next_retry_at = NOW(3)
        WHERE id = ? AND status <> 'PAID' AND ${CLAIM_HELD}`,
       [providerName, attempt.provider_reference, attempt.purchase_id, claim.token],
       conn,

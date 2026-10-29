@@ -18,6 +18,8 @@ CREATE TABLE purchases (
   failed_attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Máximo PAYMENT_MAX_ATTEMPTS (3)',
   ticket_issuance   ENUM('PENDING', 'ISSUED') NULL,
   ticket_ids        JSON            NULL,
+  ticket_attempts   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  ticket_next_retry_at DATETIME(3)  NULL,
   claim_token       CHAR(36)        NULL,
   claimed_until     DATETIME(3)     NULL,
   created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -27,7 +29,7 @@ CREATE TABLE purchases (
   KEY ix_purchases_user (user_id, created_at),
   KEY ix_purchases_event (event_id, status, created_at),
   KEY ix_purchases_reference (payment_provider, payment_reference),
-  KEY ix_purchases_ticket_issuance (ticket_issuance),
+  KEY ix_purchases_ticket_retry (ticket_issuance, ticket_next_retry_at),
   CONSTRAINT ck_purchases_total CHECK (total >= 0)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
