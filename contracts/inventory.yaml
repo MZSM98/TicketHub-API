@@ -183,6 +183,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
   /events/{eventId}/zones:
     parameters:
@@ -191,7 +193,7 @@ paths:
       tags: [Zones]
       operationId: listEventZones
       summary: List zones of my event with counters (CU-12)
-      description: '**Role:** ORGANIZER (owner), ADMIN. Includes raw `reservedCount` and `soldCount`.'
+      description: '**Role:** ORGANIZER (owner), ADMIN. Includes raw `reservedCount` and `soldCount`. Ownership is checked with CatalogService; 503 when it is not reachable.'
       responses:
         '200':
           description: Zones.
@@ -207,6 +209,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
     post:
       tags: [Zones]
       operationId: createZone
@@ -307,6 +311,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
     delete:
       tags: [Zones]
       operationId: deleteZone
@@ -330,6 +336,8 @@ paths:
               example:
                 code: ZONE_HAS_SALES
                 message: La zona ya tiene asientos reservados o vendidos
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
   /reservations:
     post:
@@ -451,6 +459,8 @@ paths:
               example:
                 code: RESERVATION_FAILED
                 message: Error al procesar reserva
+        '503':
+          $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
   /reservations/active:
     get:
