@@ -16,12 +16,19 @@ services:
       RESERVATION_TTL_MINUTES: '0.05'
       RESERVATION_SWEEP_SECONDS: '0'
 
+  inventory-nocatalog:
+    extends: { file: docker-compose.yml, service: inventory-service }
+    environment:
+      CATALOG_SERVICE_URL: http://catalog-down.invalid:3002
+
   tests:
     environment:
       INVENTORY_URL: http://inventory-service:3003/api/v1
       INVENTORY_SWEEP_URL: http://inventory-sweep:3003/api/v1
       INVENTORY_LAZY_URL: http://inventory-lazy:3003/api/v1
+      INVENTORY_NOCATALOG_URL: http://inventory-nocatalog:3003/api/v1
     depends_on:
       inventory-service: { condition: service_healthy }
       inventory-sweep: { condition: service_healthy }
       inventory-lazy: { condition: service_healthy }
+      inventory-nocatalog: { condition: service_healthy }
