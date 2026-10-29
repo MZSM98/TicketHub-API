@@ -38,7 +38,10 @@ async function post(path, params, idempotencyKey) {
   return { status: res.status, body };
 }
 
-export async function charge({
+const intentOf = (body) =>
+  body?.object === 'payment_intent' && typeof body.id === 'string' ? body : null;
+
+export async function authorize({
   amountCents,
   currency,
   paymentMethodToken,
@@ -50,21 +53,22 @@ export async function charge({
     currency: currency.toLowerCase(),
     payment_method: paymentMethodToken,
     'payment_method_types[]': 'card',
+    capture_method: 'manual',
     confirm: 'true',
   };
   for (const [key, value] of Object.entries(metadata)) params[`metadata[${key}]`] = String(value);
   const { status, body } = await post('/v1/payment_intents', params, idempotencyKey);
-  if (status === 200 && body.object === 'payment_intent' && typeof body.id === 'string') {
-    if (body.status === 'succeeded') return { approved: true, reference: body.id };
-    await post(`/v1/payment_intents/${body.id}/cancel`, {}, `${idempotencyKey}-cancel`).catch(
-      () => null,
-    );
-    return { approved: false, reference: body.id, declineCode: body.status };
+  const intent = status === 200 ? intentOf(body) : null;
+  if (intent) {
+    if (intent.status === 'requires_capture' || intent.status === 'succeeded') {
+      return { outcome: 'authorized', reference: intent.id };
+    }
+    return { outcome: 'declined', reference: intent.id, declineCode: intent.status };
   }
   const error = body.error;
   if (status === 402 && error?.type === 'card_error') {
     return {
-      approved: false,
+      outcome: 'declined',
       reference: error.payment_intent?.id ?? null,
       declineCode: error.decline_code ?? error.code ?? 'card_declined',
     };
@@ -75,12 +79,39 @@ export async function charge({
     error.param === 'payment_method'
   ) {
     return {
-      approved: false,
+      outcome: 'declined',
       reference: null,
       declineCode: error.code ?? 'invalid_payment_method',
     };
   }
   throw new PaymentProviderError(`Stripe respondió ${status}`);
+}
+
+const unexpectedState = (body) =>
+  body.error?.code === 'payment_intent_unexpected_state' ? body.error.payment_intent?.status : null;
+
+export async function capture({ reference, idempotencyKey }) {
+  const { status, body } = await post(
+    `/v1/payment_intents/${reference}/capture`,
+    {},
+    idempotencyKey,
+  );
+  if (status === 200 && intentOf(body)?.status === 'succeeded') return;
+  if (unexpectedState(body) === 'succeeded') return;
+  throw new PaymentProviderError(`Stripe respondió ${status} al capturar`);
+}
+
+export async function cancel({ reference, idempotencyKey }) {
+  const { status, body } = await post(
+    `/v1/payment_intents/${reference}/cancel`,
+    {},
+    idempotencyKey,
+  );
+  if (status === 200 && intentOf(body)?.status === 'canceled') return 'canceled';
+  const state = unexpectedState(body);
+  if (state === 'canceled') return 'canceled';
+  if (state === 'succeeded') return 'captured';
+  throw new PaymentProviderError(`Stripe respondió ${status} al cancelar`);
 }
 
 export async function refund({ reference, idempotencyKey }) {

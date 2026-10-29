@@ -18,6 +18,8 @@ CREATE TABLE purchases (
   failed_attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Máximo PAYMENT_MAX_ATTEMPTS (3)',
   ticket_issuance   ENUM('PENDING', 'ISSUED') NULL,
   ticket_ids        JSON            NULL,
+  claim_token       CHAR(36)        NULL,
+  claimed_until     DATETIME(3)     NULL,
   created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -42,4 +44,27 @@ CREATE TABLE purchase_items (
   CONSTRAINT fk_purchase_items_purchase FOREIGN KEY (purchase_id) REFERENCES purchases (id),
   CONSTRAINT ck_purchase_items_quantity CHECK (quantity > 0),
   CONSTRAINT ck_purchase_items_price CHECK (unit_price >= 0)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE payment_attempts (
+  id                 BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  purchase_id        BIGINT UNSIGNED  NOT NULL,
+  reservation_id     BIGINT UNSIGNED  NOT NULL,
+  attempt            TINYINT UNSIGNED NOT NULL,
+  idempotency_key    VARCHAR(100)     NOT NULL,
+  payment_method     VARCHAR(255)     NOT NULL,
+  amount_cents       INT UNSIGNED     NOT NULL,
+  currency           ENUM('MXN')      NOT NULL DEFAULT 'MXN',
+  provider_reference VARCHAR(255)     NULL,
+  status             ENUM('PENDING', 'AUTHORIZED', 'CAPTURED', 'DECLINED', 'CANCEL_PENDING', 'CANCELED', 'REFUND_PENDING', 'REFUNDED') NOT NULL,
+  decline_code       VARCHAR(100)     NULL,
+  last_error         VARCHAR(255)     NULL,
+  created_at         DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at         DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_payment_attempts_attempt (reservation_id, attempt),
+  UNIQUE KEY uq_payment_attempts_key (idempotency_key),
+  KEY ix_payment_attempts_status (status, updated_at),
+  KEY ix_payment_attempts_purchase (purchase_id),
+  CONSTRAINT fk_payment_attempts_purchase FOREIGN KEY (purchase_id) REFERENCES purchases (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

@@ -176,6 +176,8 @@ services:
       STRIPE_API_BASE: ${STRIPE_API_BASE:-https://api.stripe.com}
       STRIPE_TIMEOUT_MS: ${STRIPE_TIMEOUT_MS:-10000}
       TICKET_RETRY_SECONDS: ${TICKET_RETRY_SECONDS:-30}
+      PAYMENT_SWEEP_SECONDS: ${PAYMENT_SWEEP_SECONDS:-60}
+      PAYMENT_RECONCILE_AFTER_SECONDS: ${PAYMENT_RECONCILE_AFTER_SECONDS:-60}
     depends_on:
       mysql: { condition: service_healthy }
 

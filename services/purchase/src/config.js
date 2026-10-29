@@ -25,6 +25,8 @@ export const config = {
   paymentProvider: process.env.PAYMENT_PROVIDER ?? 'stripe',
   paymentMaxAttempts: atLeastOne('PAYMENT_MAX_ATTEMPTS', 3),
   ticketRetryMs: positiveNumber('TICKET_RETRY_SECONDS', 30) * 1000,
+  paymentSweepMs: positiveNumber('PAYMENT_SWEEP_SECONDS', 60) * 1000,
+  reconcileAfterSeconds: positiveNumber('PAYMENT_RECONCILE_AFTER_SECONDS', 60),
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY ?? '',
     apiBase: process.env.STRIPE_API_BASE ?? 'https://api.stripe.com',
@@ -36,3 +38,6 @@ export const config = {
     ticket: process.env.TICKET_SERVICE_URL ?? 'http://ticket-service:3005',
   },
 };
+
+config.claimSeconds =
+  Math.ceil((3 * config.stripe.timeoutMs + 3 * config.internalTimeoutMs) / 1000) + 5;

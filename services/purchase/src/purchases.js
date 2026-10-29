@@ -1,14 +1,18 @@
-import { createHash } from 'node:crypto';
-import { query, transaction } from '@tickethub/common/db';
+import { query } from '@tickethub/common/db';
 import { forbidden, HttpError, serviceUnavailable } from '@tickethub/common/http';
 import { config } from './config.js';
 import {
-  charge,
-  PaymentProviderError,
-  PaymentUnavailableError,
-  providerName,
-  refund,
-} from './payments/index.js';
+  captureAttempt,
+  claimPurchase,
+  completePurchase,
+  createAttempt,
+  openAttempt,
+  recordAuthorization,
+  releaseClaim,
+  sendAuthorization,
+  undoAttempt,
+} from './attempts.js';
+import { PaymentProviderError, PaymentUnavailableError, providerName } from './payments/index.js';
 import { confirmSale, getReservation, releaseReservation } from './services.js';
 import { issueFor } from './tickets.js';
 
@@ -58,30 +62,11 @@ export const toPurchase = (row) => ({
 
 const toCents = (money) => Number(money.replace('.', ''));
 
-export async function findByReservation(reservationId, conn) {
-  const [row] = await query(
-    `SELECT ${PURCHASE_COLUMNS} FROM purchases WHERE reservation_id = ?${conn ? ' FOR UPDATE' : ''}`,
-    [reservationId],
-    conn,
-  );
+export async function findByReservation(reservationId) {
+  const [row] = await query(`SELECT ${PURCHASE_COLUMNS} FROM purchases WHERE reservation_id = ?`, [
+    reservationId,
+  ]);
   return row ?? null;
-}
-
-const isLockFailure = (err) => err?.errno === 1213 || err?.errno === 1205;
-
-async function withRetry(work) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await work();
-    } catch (err) {
-      if (!isLockFailure(err) || attempt >= 3) throw err;
-    }
-  }
-}
-
-function idempotencyKey(reservationId, attempt, paymentMethodToken) {
-  const token = createHash('sha256').update(paymentMethodToken).digest('hex').slice(0, 16);
-  return `tickethub-reservation-${reservationId}-attempt-${attempt}-${token}`;
 }
 
 async function exhausted(reservationId) {
@@ -90,28 +75,10 @@ async function exhausted(reservationId) {
   return attemptsExhausted();
 }
 
-async function undoCharge(reference, key) {
-  try {
-    await refund({ reference, idempotencyKey: `${key}-refund` });
-  } catch (err) {
-    console.error(`No se pudo reembolsar ${reference}: ${err.message}`);
-  }
-}
-
 function saleFailure(status) {
   if (status === 410) return reservationExpired();
   if (status === 409) return reservationNotActive();
   return serviceUnavailable();
-}
-
-export async function savePurchaseItems(purchaseId, items, conn) {
-  for (const item of items) {
-    await query(
-      'INSERT INTO purchase_items (purchase_id, zone_id, seat_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)',
-      [purchaseId, item.zoneId, item.seatId ?? null, item.quantity, item.unitPrice],
-      conn,
-    );
-  }
 }
 
 async function preflight(userId, reservationId) {
@@ -131,73 +98,112 @@ async function preflight(userId, reservationId) {
   return reservation;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function purchaseById(id) {
+  const [row] = await query(`SELECT ${PURCHASE_COLUMNS} FROM purchases WHERE id = ?`, [id]);
+  return row;
+}
+
+async function ensurePurchaseRow(userId, reservation) {
+  await query(
+    `INSERT INTO purchases (reservation_id, user_id, event_id, total, currency, payment_provider, status, failed_attempts)
+     VALUES (?, ?, ?, ?, ?, ?, 'DECLINED', 0)
+     ON DUPLICATE KEY UPDATE id = id`,
+    [
+      reservation.id,
+      userId,
+      reservation.eventId,
+      reservation.total,
+      reservation.currency,
+      providerName,
+    ],
+  );
+  return findByReservation(reservation.id);
+}
+
+async function waitForClaim(purchaseId) {
+  const deadline = Date.now() + (config.claimSeconds + 2) * 1000;
+  while (Date.now() < deadline) {
+    const claim = await claimPurchase(purchaseId);
+    if (claim) return claim;
+    const row = await purchaseById(purchaseId);
+    if (row.status === 'PAID') throw alreadyPaid(row.id);
+    await sleep(100);
+  }
+  throw serviceUnavailable();
+}
+
+function providerFailure(err) {
+  if (err instanceof PaymentUnavailableError) return gatewayUnavailable();
+  if (err instanceof PaymentProviderError) return gatewayError();
+  return err;
+}
+
+async function authorizeAttempt(attempt, userId) {
+  let result;
+  try {
+    result = await sendAuthorization(attempt, userId);
+  } catch (err) {
+    throw providerFailure(err);
+  }
+  const recorded = await recordAuthorization(attempt, result);
+  if (recorded.authorized) return recorded.attempt;
+  if (recorded.failedAttempts >= config.paymentMaxAttempts) {
+    throw await exhausted(attempt.reservation_id);
+  }
+  return {
+    declined: declined(config.paymentMaxAttempts - recorded.failedAttempts, recorded.declineCode),
+  };
+}
+
+async function finalize(attempt, reservation) {
+  const sale = await confirmSale(attempt.reservation_id, attempt.purchase_id).catch(() => ({
+    status: 503,
+  }));
+  if (sale.status === 409 || sale.status === 410) {
+    await undoAttempt(attempt);
+    throw saleFailure(sale.status);
+  }
+  if (sale.status !== 200) throw serviceUnavailable();
+  try {
+    await captureAttempt(attempt);
+  } catch (err) {
+    throw providerFailure(err);
+  }
+  await completePurchase(attempt, reservation.items);
+}
+
+async function runClaimed(purchaseId, userId, reservation, paymentMethodToken) {
+  let open = await openAttempt(purchaseId);
+  if (open?.status === 'PENDING') {
+    const outcome = await authorizeAttempt(open, userId);
+    if (outcome.declined) open = null;
+    else open = outcome;
+  }
+  if (open) return finalize(open, reservation);
+  const row = await purchaseById(purchaseId);
+  if (row.failed_attempts >= config.paymentMaxAttempts) {
+    throw await exhausted(row.reservation_id);
+  }
+  const attempt = await createAttempt(row, paymentMethodToken, toCents(row.total));
+  const outcome = await authorizeAttempt(attempt, userId);
+  if (outcome.declined) throw outcome.declined;
+  return finalize(outcome, reservation);
+}
+
 export async function processPurchase(userId, { reservationId, paymentMethodToken }) {
   const reservation = await preflight(userId, reservationId);
-  const outcome = await withRetry(() =>
-    transaction(async (conn) => {
-      await query(
-        `INSERT INTO purchases (reservation_id, user_id, event_id, total, currency, payment_provider, status, failed_attempts)
-         VALUES (?, ?, ?, ?, ?, ?, 'DECLINED', 0)
-         ON DUPLICATE KEY UPDATE id = id`,
-        [
-          reservationId,
-          userId,
-          reservation.eventId,
-          reservation.total,
-          reservation.currency,
-          providerName,
-        ],
-        conn,
-      );
-      const row = await findByReservation(reservationId, conn);
-      if (row.status === 'PAID') return { error: alreadyPaid(row.id) };
-      if (row.failed_attempts >= config.paymentMaxAttempts) {
-        return { error: await exhausted(reservationId) };
-      }
-      const attempt = row.failed_attempts + 1;
-      const key = idempotencyKey(reservationId, attempt, paymentMethodToken);
-      let result;
-      try {
-        result = await charge({
-          amountCents: toCents(row.total),
-          currency: row.currency,
-          paymentMethodToken,
-          idempotencyKey: key,
-          metadata: { reservation_id: reservationId, user_id: userId },
-        });
-      } catch (err) {
-        if (err instanceof PaymentUnavailableError) throw gatewayUnavailable();
-        if (err instanceof PaymentProviderError) throw gatewayError();
-        throw err;
-      }
-      if (!result.approved) {
-        await query(
-          `UPDATE purchases SET status = 'DECLINED', failed_attempts = ?, payment_provider = ?,
-             payment_reference = COALESCE(?, payment_reference) WHERE id = ?`,
-          [attempt, providerName, result.reference, row.id],
-          conn,
-        );
-        if (attempt >= config.paymentMaxAttempts) return { error: await exhausted(reservationId) };
-        return { error: declined(config.paymentMaxAttempts - attempt, result.declineCode) };
-      }
-      const sale = await confirmSale(reservationId, row.id).catch(() => ({ status: 503 }));
-      if (sale.status !== 200) {
-        await undoCharge(result.reference, key);
-        throw saleFailure(sale.status);
-      }
-      await query(
-        "UPDATE purchases SET status = 'PAID', payment_provider = ?, payment_reference = ?, ticket_issuance = 'PENDING' WHERE id = ?",
-        [providerName, result.reference, row.id],
-        conn,
-      );
-      await savePurchaseItems(row.id, reservation.items, conn);
-      return { purchaseId: row.id };
-    }),
-  );
-  if (outcome.error) throw outcome.error;
-  const [row] = await query(`SELECT ${PURCHASE_COLUMNS} FROM purchases WHERE id = ?`, [
-    outcome.purchaseId,
-  ]);
-  const purchase = toPurchase(row);
+  const row = await ensurePurchaseRow(userId, reservation);
+  if (row.status === 'PAID') throw alreadyPaid(row.id);
+  const claim = await waitForClaim(row.id);
+  try {
+    const current = await purchaseById(row.id);
+    if (current.status === 'PAID') throw alreadyPaid(current.id);
+    await runClaimed(row.id, userId, reservation, paymentMethodToken);
+  } finally {
+    await releaseClaim(claim).catch(() => null);
+  }
+  const purchase = toPurchase(await purchaseById(row.id));
   return { purchase, ...(await issueFor(purchase.id)) };
 }

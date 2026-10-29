@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { router as internalRouter } from './routes/internal.js';
 import { router as purchasesRouter } from './routes/purchases.js';
 import { router as salesRouter } from './routes/sales.js';
+import { startPaymentSweep } from './sweep.js';
 import { startTicketRetries } from './tickets.js';
 
 const app = express();
@@ -27,9 +28,9 @@ const server = app.listen(config.port, () => {
   console.log(`purchase-service escuchando en el puerto ${config.port}`);
 });
 
-const retries = startTicketRetries();
+const timers = [startTicketRetries(), startPaymentSweep()].filter(Boolean);
 
 process.on('SIGTERM', () => {
-  if (retries) clearInterval(retries);
+  for (const timer of timers) clearInterval(timer);
   server.close(() => process.exit(0));
 });
