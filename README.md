@@ -151,6 +151,7 @@ Compras, historial y ventas (CU-08, CU-09, CU-13), según `contracts/purchase.ya
 - Si la venta no se puede confirmar después de autorizar (por ejemplo, la reserva venció), se cancela la autorización (o se reembolsa si ya estaba capturada) y la respuesta es 410 o 409 según el caso. Si la cancelación falla, el barrido la reintenta.
 - Si TicketService falla, la compra queda PAID con `ticketIssuance: PENDING` en la base de datos (`purchases.ticket_issuance`) y se reintenta cada `TICKET_RETRY_SECONDS`, aunque el servicio se reinicie.
 - `byZone[].revenue` de CU-13 sale de `purchase_items` (el precio pagado), así que no cambia si después se edita el precio de la zona.
+- El esquema vive en `db/init/*.sql` y solo se aplica cuando el volumen de MySQL está vacío; no hay herramienta de migraciones. Después de cambiar un `.sql`, recrea la base con `docker compose down -v` y `docker compose up -d --build` (borra los datos locales).
 
 Para probar contra Stripe en modo prueba, pon en `.env` `STRIPE_SECRET_KEY` con tu llave `sk_test_...` y `STRIPE_API_BASE=https://api.stripe.com`, levanta el stack normal (sin `docker-compose.test.yml`) y paga una reserva con `pm_card_visa` o `pm_card_chargeDeclined`.
 

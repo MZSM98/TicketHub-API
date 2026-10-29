@@ -204,6 +204,25 @@ export async function captureOrMarkFailed(claim, attempt) {
   }
 }
 
+function mergeGeneralItems(items) {
+  const merged = [];
+  const byZone = new Map();
+  for (const item of items) {
+    if (item.seatId) {
+      merged.push(item);
+      continue;
+    }
+    const existing = byZone.get(item.zoneId);
+    if (existing) existing.quantity += item.quantity;
+    else {
+      const copy = { ...item, seatId: null };
+      byZone.set(item.zoneId, copy);
+      merged.push(copy);
+    }
+  }
+  return merged;
+}
+
 export async function completePurchase(claim, attempt, items) {
   await transaction(async (conn) => {
     await updateAttempt(claim, attempt.id, "a.status = 'CAPTURED', a.last_error = NULL", [], conn);
@@ -215,7 +234,7 @@ export async function completePurchase(claim, attempt, items) {
       conn,
     );
     if (result.affectedRows !== 1) return;
-    for (const item of items) {
+    for (const item of mergeGeneralItems(items)) {
       await query(
         'INSERT INTO purchase_items (purchase_id, zone_id, seat_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)',
         [attempt.purchase_id, item.zoneId, item.seatId ?? null, item.quantity, item.unitPrice],
