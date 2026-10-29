@@ -186,7 +186,7 @@ export async function processPurchase(userId, { reservationId, paymentMethodToke
         throw saleFailure(sale.status);
       }
       await query(
-        "UPDATE purchases SET status = 'PAID', payment_provider = ?, payment_reference = ? WHERE id = ?",
+        "UPDATE purchases SET status = 'PAID', payment_provider = ?, payment_reference = ?, ticket_issuance = 'PENDING' WHERE id = ?",
         [providerName, result.reference, row.id],
         conn,
       );
@@ -199,5 +199,5 @@ export async function processPurchase(userId, { reservationId, paymentMethodToke
     outcome.purchaseId,
   ]);
   const purchase = toPurchase(row);
-  return { purchase, ...(await issueFor(purchase, reservation)) };
+  return { purchase, ...(await issueFor(purchase.id)) };
 }

@@ -16,6 +16,8 @@ CREATE TABLE purchases (
   payment_reference VARCHAR(255)    NULL COMMENT 'Id del cargo en el proveedor',
   status            ENUM('PAID', 'DECLINED') NOT NULL,
   failed_attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Máximo PAYMENT_MAX_ATTEMPTS (3)',
+  ticket_issuance   ENUM('PENDING', 'ISSUED') NULL,
+  ticket_ids        JSON            NULL,
   created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -23,6 +25,7 @@ CREATE TABLE purchases (
   KEY ix_purchases_user (user_id, created_at),
   KEY ix_purchases_event (event_id, status, created_at),
   KEY ix_purchases_reference (payment_provider, payment_reference),
+  KEY ix_purchases_ticket_issuance (ticket_issuance),
   CONSTRAINT ck_purchases_total CHECK (total >= 0)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
