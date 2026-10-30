@@ -15,11 +15,20 @@ info:
     cancelled and the buyer is not charged. If the provider definitively rejects the capture, the
     authorization is cancelled, the sale is undone through
     `POST /internal/reservations/{id}/revoke-sale` (seats back to AVAILABLE), the purchase stays
-    DECLINED and the buyer gets 402 `PAYMENT_ATTEMPTS_EXHAUSTED`. A capture that fails for a
+    DECLINED and the buyer gets 402 `PAYMENT_ATTEMPTS_EXHAUSTED`. If the cancellation answers
+    404 `resource_missing` (the PaymentIntent does not exist), there is nothing to cancel: the
+    seats are released and the attempt ends CANCELED. The 402 message says the seats were
+    released only when InventoryService already released them; if the cancellation or the release
+    is still pending, the message says so and the sweep retries it. A capture that fails for a
     transient reason (timeout, 5xx, 429, invalid response) answers 503 and is retried; the seats
     stay SOLD until it resolves.
     If ticket issuance fails, the purchase is still PAID and the issue call is queued for retry
     (CU-09 EX1); the response then says `ticketIssuance: PENDING`.
+
+    **Recovery cap.** Failed cancellations, refunds and seat releases are retried by the payment
+    sweep up to `PAYMENT_RECOVERY_MAX_ATTEMPTS` times (default 20). After that the attempt ends in
+    the internal state RECOVERY_FAILED, the sweep stops retrying it and an `ALERTA:` line is
+    logged for manual review. `GET /internal/purchases/{purchaseId}/payment-attempts` shows it.
 
     **Card data.** The client tokenizes the card with the provider SDK (or sends a provider test
     payment method such as `pm_card_visa`). The API never receives or stores card numbers.
@@ -344,6 +353,41 @@ paths:
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
 
+  /internal/purchases/{purchaseId}/payment-attempts:
+    get:
+      tags: [Internal]
+      operationId: internalPaymentAttempts
+      summary: Payment attempts of a purchase (internal, operations)
+      description: |
+        **Internal** (service-to-service and operations). Lists every payment attempt of the
+        purchase with its internal status, including RECOVERY_FAILED when the recovery cap was
+        reached. Unknown purchases return an empty list.
+      security:
+        - internalAuth: []
+      parameters:
+        - name: purchaseId
+          in: path
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/Id'
+      responses:
+        '200':
+          description: Attempts ordered by attempt number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAttemptList'
+              example:
+                items:
+                  - attempt: 1
+                    status: CANCELED
+                    declineCode: resource_missing
+                    lastError: null
+                    recoveryAttempts: 0
+                    updatedAt: '2026-10-26T15:45:10Z'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -418,6 +462,49 @@ components:
           items:
             type: string
             format: uuid
+    PaymentAttemptList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentAttempt'
+    PaymentAttempt:
+      type: object
+      additionalProperties: false
+      required: [attempt, status, declineCode, lastError, recoveryAttempts, updatedAt]
+      properties:
+        attempt:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - PENDING
+            - AUTHORIZED
+            - CAPTURED
+            - CAPTURE_FAILED
+            - DECLINED
+            - FAILED
+            - CANCEL_PENDING
+            - CANCELED
+            - REFUND_PENDING
+            - REFUNDED
+            - RECOVERY_FAILED
+        declineCode:
+          type: string
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        recoveryAttempts:
+          type: integer
+          minimum: 0
+          description: Failed cancellations, refunds or releases; capped by PAYMENT_RECOVERY_MAX_ATTEMPTS.
+        updatedAt:
+          type: string
+          format: date-time
     PurchasePage:
       allOf:
         - $ref: './common.yaml#/components/schemas/PageMeta'
