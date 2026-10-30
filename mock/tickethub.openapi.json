@@ -23,7 +23,7 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "The gateway is up. Each service reports UP or DOWN.",
+            "description": "The gateway is up, so the response is always 200, even when a service is down.\n`status` is UP when every service is UP and DEGRADED when at least one service is DOWN.\nEach service reports UP or DOWN in `services`.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -36,8 +36,10 @@
                     "status": {
                       "type": "string",
                       "enum": [
-                        "UP"
-                      ]
+                        "UP",
+                        "DEGRADED"
+                      ],
+                      "description": "UP when every service is UP; DEGRADED when at least one service is DOWN."
                     },
                     "services": {
                       "type": "object",
@@ -88,14 +90,32 @@
                     }
                   }
                 },
-                "example": {
-                  "status": "UP",
-                  "services": {
-                    "identity": "UP",
-                    "catalog": "UP",
-                    "inventory": "UP",
-                    "purchase": "DOWN",
-                    "ticket": "UP"
+                "examples": {
+                  "allUp": {
+                    "summary": "Every service is UP",
+                    "value": {
+                      "status": "UP",
+                      "services": {
+                        "identity": "UP",
+                        "catalog": "UP",
+                        "inventory": "UP",
+                        "purchase": "UP",
+                        "ticket": "UP"
+                      }
+                    }
+                  },
+                  "degraded": {
+                    "summary": "PurchaseService is DOWN",
+                    "value": {
+                      "status": "DEGRADED",
+                      "services": {
+                        "identity": "UP",
+                        "catalog": "UP",
+                        "inventory": "UP",
+                        "purchase": "DOWN",
+                        "ticket": "UP"
+                      }
+                    }
                   }
                 }
               }
