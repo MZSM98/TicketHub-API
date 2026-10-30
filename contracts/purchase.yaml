@@ -455,7 +455,12 @@ components:
         ticketIssuance:
           type: string
           enum: [ISSUED, PENDING]
-          description: PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).
+          description: |
+            PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).
+            Internally the purchase moves to a FAILED issuance state once `TICKET_RETRY_MAX_ATTEMPTS`
+            retries are exhausted (logged for manual review). The API does not expose FAILED:
+            `ticketIssuance` only appears in this response, which always says ISSUED or PENDING,
+            and `GET /purchases/me` and `GET /purchases/{purchaseId}` do not include it.
         ticketIds:
           type: array
           description: Empty when `ticketIssuance` is PENDING.
