@@ -2,6 +2,7 @@ import { config } from '../config.js';
 import * as stripe from './stripe.js';
 
 export {
+  PaymentCaptureDeclinedError,
   PaymentIdempotencyError,
   PaymentProviderError,
   PaymentUnavailableError,

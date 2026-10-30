@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import {
+  PaymentCaptureDeclinedError,
   PaymentIdempotencyError,
   PaymentProviderError,
   PaymentUnavailableError,
@@ -102,15 +103,29 @@ export async function authorize({
 const unexpectedState = (body) =>
   body.error?.code === 'payment_intent_unexpected_state' ? body.error.payment_intent?.status : null;
 
+const DEFINITIVE_CAPTURE_STATUSES = new Set([400, 402, 404]);
+const DEFINITIVE_ERROR_TYPES = new Set(['card_error', 'invalid_request_error']);
+
 export async function capture({ reference, idempotencyKey }) {
-  const { status, body } = await post(
-    `/v1/payment_intents/${reference}/capture`,
-    {},
-    idempotencyKey,
-  );
+  let response;
+  try {
+    response = await post(`/v1/payment_intents/${reference}/capture`, {}, idempotencyKey);
+  } catch (err) {
+    if (err instanceof PaymentUnavailableError) throw err;
+    throw new PaymentUnavailableError(`Captura sin respuesta definitiva: ${err.message}`);
+  }
+  const { status, body } = response;
   if (status === 200 && intentOf(body)?.status === 'succeeded') return;
-  if (unexpectedState(body) === 'succeeded') return;
-  throw new PaymentProviderError(`Stripe respondió ${status} al capturar`);
+  const state = unexpectedState(body);
+  if (state === 'succeeded') return;
+  if (state === 'requires_capture') {
+    throw new PaymentUnavailableError('Stripe aún reporta la autorización sin capturar');
+  }
+  if (DEFINITIVE_CAPTURE_STATUSES.has(status) && DEFINITIVE_ERROR_TYPES.has(body.error?.type)) {
+    const code = body.error.decline_code ?? body.error.code ?? body.error.type;
+    throw new PaymentCaptureDeclinedError(`Stripe rechazó la captura (${status} ${code})`, code);
+  }
+  throw new PaymentUnavailableError(`Stripe respondió ${status} al capturar`);
 }
 
 export async function cancel({ reference, idempotencyKey }) {
