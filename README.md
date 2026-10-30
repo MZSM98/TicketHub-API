@@ -27,6 +27,7 @@ docker compose up -d --build
 curl http://localhost:8080/api/v1/health
 ```
 
+- `/api/v1/health` responde siempre 200 con el estado de cada servicio en `services`. `status` es `UP` si todos están `UP` y `DEGRADED` si alguno está `DOWN`.
 - Solo el gateway queda expuesto (`GATEWAY_HOST_PORT`, 8080 por defecto). Los servicios viven en la red privada `tickethub`.
 - MySQL en `127.0.0.1:3306`, consola de MinIO en `http://localhost:9001` y buzón de Mailpit en `http://localhost:8025`.
 - Los scripts de `db/init/` solo corren cuando el volumen de MySQL está vacío. Para recrear la base: `docker compose down -v`.
