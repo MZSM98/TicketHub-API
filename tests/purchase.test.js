@@ -986,7 +986,9 @@ describe('PurchaseService (purchase.yaml)', () => {
       [after.ticketsSold, after.purchases, after.grossRevenue],
       [before.ticketsSold, before.purchases, before.grossRevenue],
     );
-    const purchase = (await expectContract('GET', '/purchases/me', 200, { token })).items[0];
+    const purchase = (await expectContract('GET', '/purchases/me', 200, { token })).items.find(
+      (p) => p.reservationId === reservation.id,
+    );
     const [attempt] = await attemptsOf(purchase.id);
     assert.deepEqual([attempt.status, attempt.recoveryAttempts], ['CANCELED', 0]);
     await sleep(6000);
