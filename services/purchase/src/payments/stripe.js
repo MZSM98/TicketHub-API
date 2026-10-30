@@ -171,6 +171,7 @@ export async function cancel({ reference, idempotencyKey }) {
     idempotencyKey,
   );
   if (status === 200 && intentOf(body)?.status === 'canceled') return 'canceled';
+  if (status === 404 && body.error?.code === 'resource_missing') return 'missing';
   const state = unexpectedState(body);
   if (state === 'canceled') return 'canceled';
   if (state === 'succeeded') return 'captured';

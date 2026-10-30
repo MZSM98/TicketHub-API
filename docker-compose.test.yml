@@ -16,6 +16,13 @@ services:
       INVENTORY_SERVICE_URL: http://tests:4100
       PURCHASE_SERVICE_URL: http://tests:4100
 
+  gateway-slow:
+    extends: { file: docker-compose.yml, service: gateway }
+    ports: !reset []
+    environment:
+      GATEWAY_REQUEST_TIMEOUT_SECONDS: '3'
+      GATEWAY_HEADERS_TIMEOUT_SECONDS: '2'
+
   purchase-service:
     environment:
       STRIPE_API_BASE: http://tests:4100
@@ -25,6 +32,7 @@ services:
       TICKET_RETRY_SECONDS: '0'
       PAYMENT_SWEEP_SECONDS: '1'
       PAYMENT_RECONCILE_AFTER_SECONDS: '4'
+      PAYMENT_RECOVERY_MAX_ATTEMPTS: '3'
       TICKET_RETRY_BACKOFF_SECONDS: '1'
 
   purchase-isolated:
@@ -48,10 +56,11 @@ services:
       STRIPE_API_BASE: http://tests:4100
       STRIPE_SECRET_KEY: sk_test_fake_tickethub
       STRIPE_TIMEOUT_MS: '1500'
+      INTERNAL_TIMEOUT_MS: '1500'
       TICKET_SERVICE_URL: http://tests:4100
       TICKET_RETRY_SECONDS: '0'
       PAYMENT_SWEEP_SECONDS: '0'
-      PAYMENT_CLAIM_SECONDS: '1'
+      PAYMENT_CLAIM_SECONDS: '2'
 
   inventory-sweep:
     extends: { file: docker-compose.yml, service: inventory-service }
@@ -79,6 +88,7 @@ services:
       PURCHASE_URL: http://purchase-service:3004/api/v1
       PURCHASE_ISOLATED_URL: http://purchase-isolated:3004/api/v1
       PURCHASE_SHORTCLAIM_URL: http://purchase-shortclaim:3004/api/v1
+      GATEWAY_SLOW_URL: http://gateway-slow:8080/api/v1
     depends_on:
       inventory-service: { condition: service_healthy }
       inventory-sweep: { condition: service_healthy }
@@ -87,3 +97,4 @@ services:
       purchase-service: { condition: service_healthy }
       purchase-isolated: { condition: service_healthy }
       purchase-shortclaim: { condition: service_healthy }
+      gateway-slow: { condition: service_started }

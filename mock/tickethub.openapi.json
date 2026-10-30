@@ -12051,7 +12051,7 @@
         ],
         "operationId": "createReservation",
         "summary": "Reserve seats or general tickets (CU-06)",
-        "description": "**Role:** BUYER. All items must belong to `eventId`, which must be PUBLISHED and in the future.\nA buyer can have only one ACTIVE reservation at a time. Max `MAX_TICKETS_PER_RESERVATION`\ntickets (default 10). Each item is either `{ seatId }` (NUMBERED zone) or\n`{ zoneId, quantity }` (GENERAL zone).\n",
+        "description": "**Role:** BUYER. All items must belong to `eventId`, which must be PUBLISHED and in the future.\nA buyer can have only one ACTIVE reservation at a time. Max `MAX_TICKETS_PER_RESERVATION`\ntickets (default 10). The hard limit is 10: InventoryService refuses to start when\n`MAX_TICKETS_PER_RESERVATION` is not an integer between 1 and 10. Each item is either `{ seatId }` (NUMBERED zone) or\n`{ zoneId, quantity }` (GENERAL zone).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -12073,7 +12073,7 @@
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 10,
-                    "description": "At most `MAX_TICKETS_PER_RESERVATION` (default 10) items.",
+                    "description": "At most `MAX_TICKETS_PER_RESERVATION` (integer 1-10, default 10) items; never more than 10.",
                     "items": {
                       "oneOf": [
                         {
@@ -13835,7 +13835,7 @@
                         "ISSUED",
                         "PENDING"
                       ],
-                      "description": "PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1)."
+                      "description": "PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).\nInternally the purchase moves to a FAILED issuance state once `TICKET_RETRY_MAX_ATTEMPTS`\nretries are exhausted (logged for manual review). The API does not expose FAILED:\n`ticketIssuance` only appears in this response, which always says ISSUED or PENDING,\nand `GET /purchases/me` and `GET /purchases/{purchaseId}` do not include it.\n"
                     },
                     "ticketIds": {
                       "type": "array",

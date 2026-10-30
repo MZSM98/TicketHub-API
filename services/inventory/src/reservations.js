@@ -243,12 +243,17 @@ export const confirmAction = (purchaseId) => async (row, conn) => {
   return confirmLocked(conn, row, purchaseId);
 };
 
+const notRevocable = (status) =>
+  new HttpError(409, 'INVALID_RESERVATION_STATE', 'La venta de la reserva no se puede revocar', {
+    status,
+  });
+
 export const revokeSaleAction = (purchaseId) => async (row, conn) => {
   if (row.status === 'CONFIRMED') {
-    if (row.purchase_id !== purchaseId) return invalidState(row.status);
+    if (row.purchase_id !== purchaseId) return notRevocable(row.status);
     return revokeLocked(conn, row);
   }
-  if (row.status === 'ACTIVE') return invalidState(row.status);
+  if (row.status === 'ACTIVE') return notRevocable(row.status);
   return null;
 };
 

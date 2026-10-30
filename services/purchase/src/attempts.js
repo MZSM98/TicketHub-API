@@ -222,6 +222,23 @@ async function markVoided(claim, attempt) {
   });
 }
 
+async function recoveryFailed(claim, attempt, status, error) {
+  const message = String(error).slice(0, 255);
+  await updateAttempt(
+    claim,
+    attempt.id,
+    "a.recovery_attempts = a.recovery_attempts + 1, a.status = IF(a.recovery_attempts >= ?, 'RECOVERY_FAILED', ?), a.last_error = ?",
+    [config.recoveryMaxAttempts, status, message],
+  );
+  const current = await findAttempt(attempt.id);
+  if (current.status === 'RECOVERY_FAILED') {
+    console.error(
+      `ALERTA: el intento ${attempt.idempotency_key} (compra ${attempt.purchase_id}, reserva ${attempt.reservation_id}) quedó RECOVERY_FAILED tras ${current.recovery_attempts} intentos de recuperación desde ${status}; requiere revisión manual: ${message}`,
+    );
+  }
+  return current.status;
+}
+
 export async function voidDeclinedCapture(claim, attempt) {
   let outcome;
   try {
@@ -233,7 +250,7 @@ export async function voidDeclinedCapture(claim, attempt) {
     console.error(
       `No se pudo cancelar ${attempt.provider_reference} tras la captura rechazada: ${err.message}`,
     );
-    await touch(claim, attempt, err.message);
+    await recoveryFailed(claim, attempt, 'CAPTURE_FAILED', err.message);
     return 'pending';
   }
   if (outcome === 'captured') {
@@ -241,10 +258,15 @@ export async function voidDeclinedCapture(claim, attempt) {
     await setStatus(claim, attempt, 'AUTHORIZED', 'Stripe reporta la captura como hecha');
     return 'captured';
   }
+  if (outcome === 'missing') {
+    console.error(
+      `${attempt.provider_reference} no existe en Stripe al cancelar; no hay cargo y se liberan los asientos`,
+    );
+  }
   const revoked = await revokeSale(attempt.reservation_id, attempt.purchase_id).catch(() => false);
   if (!revoked) {
     console.error(`No se pudo liberar la reserva ${attempt.reservation_id}; se reintentará`);
-    await touch(claim, attempt, 'Inventory no liberó la venta');
+    await recoveryFailed(claim, attempt, 'CAPTURE_FAILED', 'Inventory no liberó la venta');
     return 'pending';
   }
   await markVoided(claim, attempt);
@@ -260,7 +282,8 @@ export async function captureOrVoid(claim, attempt) {
         `Captura rechazada de ${attempt.provider_reference} (compra ${attempt.purchase_id}); se cancela la autorización y se liberan los asientos: ${err.message}`,
       );
       await markCaptureDeclined(claim, attempt, err);
-      if ((await voidDeclinedCapture(claim, attempt)) === 'captured') return;
+      err.voidOutcome = await voidDeclinedCapture(claim, attempt);
+      if (err.voidOutcome === 'captured') return;
     }
     throw err;
   }
@@ -331,7 +354,7 @@ export async function undoAttempt(claim, attempt) {
       console.error(
         `No se pudo buscar la autorización de ${attempt.idempotency_key}: ${err.message}`,
       );
-      return setStatus(claim, attempt, 'CANCEL_PENDING', err.message.slice(0, 255));
+      return recoveryFailed(claim, attempt, 'CANCEL_PENDING', err.message);
     }
     if (!reference) return setStatus(claim, attempt, 'FAILED', attempt.last_error);
     attempt = { ...attempt, provider_reference: reference };
@@ -344,12 +367,14 @@ export async function undoAttempt(claim, attempt) {
         reference: attempt.provider_reference,
         idempotencyKey: `${attempt.idempotency_key}-cancel`,
       });
-      if (outcome === 'canceled') return setStatus(claim, attempt, 'CANCELED');
+      if (outcome === 'canceled' || outcome === 'missing') {
+        return setStatus(claim, attempt, 'CANCELED');
+      }
       status = 'REFUND_PENDING';
       await setStatus(claim, attempt, status);
     } catch (err) {
       console.error(`No se pudo cancelar ${attempt.provider_reference}: ${err.message}`);
-      return setStatus(claim, attempt, status, err.message.slice(0, 255));
+      return recoveryFailed(claim, attempt, status, err.message);
     }
   }
   try {
@@ -360,6 +385,6 @@ export async function undoAttempt(claim, attempt) {
     return setStatus(claim, attempt, 'REFUNDED');
   } catch (err) {
     console.error(`No se pudo reembolsar ${attempt.provider_reference}: ${err.message}`);
-    return setStatus(claim, attempt, status, err.message.slice(0, 255));
+    return recoveryFailed(claim, attempt, status, err.message);
   }
 }

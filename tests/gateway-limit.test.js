@@ -25,7 +25,10 @@ function rawRequest(headers, writeBody) {
       },
     );
     let answered = false;
-    req.on('response', () => (answered = true));
+    req.on('response', () => {
+      answered = true;
+      req.answered = true;
+    });
     req.on('error', (err) => {
       if (!answered && !['ECONNRESET', 'EPIPE'].includes(err.code)) reject(err);
     });
@@ -54,6 +57,7 @@ describe('límite de 100 KB en el gateway', () => {
       const chunk = Buffer.alloc(16 * 1024, 'x');
       const pump = () => {
         if (req.destroyed) return;
+        if (req.answered) return req.end();
         if (sent >= 64 * 1024 * 1024) return req.end();
         sent += chunk.length;
         if (!req.write(chunk)) return req.once('drain', pump);
