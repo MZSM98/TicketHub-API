@@ -108,14 +108,14 @@ Las pruebas de integración usan `node:test` y `fetch`, y llaman a la API a trav
 
 ```bash
 docker compose up -d --build
-npm test   # levanta un stack aparte (-p tickethub-test), crea el admin, corre tests/ y lo borra
+npm test   # levanta un stack aparte (-p tickethub-test-<pid>-<epoch>, o TEST_COMPOSE_PROJECT), crea el admin, corre tests/ y lo borra
 ```
 
 Cada respuesta se compara contra el schema de su contrato (`tests/contract.js`), incluido que no traiga campos que el contrato no define.
 
 CatalogService llama a InventoryService para publicar un evento (al menos una zona, `GET /internal/zones?eventId=`) y para borrar un DRAFT (`DELETE /internal/events/{eventId}/zones`), y a PurchaseService para las ventas del resumen CU-16 (`GET /internal/stats/sales`). En el stack de pruebas, `docker-compose.test.yml` apunta `catalog-service` y `purchase-service` a `tests/fakes.js`. El fake reenvía las llamadas de zonas y de ventas a los servicios reales, permite simular que no responden, y hace de Stripe y de TicketService falsos. Las pruebas nunca llaman al Stripe real.
 
-`docker-compose.test.yml` también levanta dos copias de InventoryService con reservas de 3 segundos (`RESERVATION_TTL_MINUTES=0.05`): `inventory-sweep`, con limpieza cada segundo, e `inventory-lazy`, sin limpieza periódica. Las pruebas de vencimiento reservan a través de ellas. `npm test` usa su propio proyecto de Compose (`tickethub-test`) sin puertos publicados, así que no toca el stack de desarrollo y puede correr a la vez; al terminar lo borra con `down -v`. La prueba de concurrencia manda 50 reservas simultáneas por el gateway al mismo asiento y a una zona general, e imprime el resultado.
+`docker-compose.test.yml` también levanta dos copias de InventoryService con reservas de 3 segundos (`RESERVATION_TTL_MINUTES=0.05`): `inventory-sweep`, con limpieza cada segundo, e `inventory-lazy`, sin limpieza periódica. Las pruebas de vencimiento reservan a través de ellas. `npm test` (`scripts/test.sh`) usa su propio proyecto de Compose sin puertos publicados, con nombre único por corrida (`tickethub-test-<pid>-<epoch>`, o el valor de `TEST_COMPOSE_PROJECT`), así que no toca el stack de desarrollo y dos corridas pueden ir a la vez; al terminar, o si se interrumpe, borra ese mismo proyecto con `down -v`. La prueba de concurrencia manda 50 reservas simultáneas por el gateway al mismo asiento y a una zona general, e imprime el resultado.
 
 ## CatalogService
 
