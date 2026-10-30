@@ -11,7 +11,13 @@ El firewall (`deploy/firewall.sh`, servicio `tickethub-firewall`) se aplica en l
 
 - VirtualBox 7.x y Vagrant 2.4+.
 - Un `.env` en la raíz con los secretos. Se genera una vez con `bash deploy/gen-env.sh .env` y nunca se sube al repositorio. Los mismos `JWT_SECRET`, `INTERNAL_TOKEN` y `GATEWAY_FORWARD_SECRET` sirven a las dos VMs porque ambas leen `/vagrant/.env`.
-- Stripe queda con `STRIPE_SECRET_KEY=sk_test_replace_me`; para probar pagos pon una clave `sk_test_` propia en `.env` y ejecuta `vagrant provision vm2`.
+- Stripe queda con `STRIPE_SECRET_KEY=sk_test_replace_me`; para probar pagos pon una clave `sk_test_` propia en `.env` y recarga solo purchase dentro de vm2 (`vagrant ssh vm2`):
+
+  ```bash
+  sudo docker compose --env-file /vagrant/.env -f /vagrant/deploy/vm2/docker-compose.yml up -d purchase-service
+  ```
+
+  `vagrant provision vm2` también funciona, pero reinicia Docker y reconstruye todo.
 
 ## Uso
 
