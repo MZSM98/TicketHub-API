@@ -246,6 +246,7 @@ services:
       - ./mock:/app/mock:ro
       - ./services/gateway/src:/app/services/gateway/src:ro
       - ./services/common/src:/app/services/common/src:ro
+      - ./services/purchase/src/config.js:/app/services/purchase/src/config.js:ro
     command: ['node', '--test', '--test-concurrency=1', '--test-reporter=spec', 'tests/']
     environment:
       GATEWAY_URL: http://gateway:8080/api/v1
