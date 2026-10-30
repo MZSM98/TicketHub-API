@@ -122,6 +122,28 @@ async function confirmLocked(conn, row, purchaseId) {
   row.purchase_id = purchaseId;
 }
 
+async function revokeLocked(conn, row) {
+  await query(
+    "UPDATE seats SET status = 'AVAILABLE', reservation_id = NULL WHERE reservation_id = ? AND status = 'SOLD'",
+    [row.id],
+    conn,
+  );
+  for (const { zone_id: zoneId, quantity } of await quantitiesByZone(row.id, conn)) {
+    await query(
+      'UPDATE zones SET sold_count = sold_count - ? WHERE id = ?',
+      [Number(quantity), zoneId],
+      conn,
+    );
+  }
+  await query(
+    "UPDATE reservations SET status = 'CANCELLED', purchase_id = NULL WHERE id = ?",
+    [row.id],
+    conn,
+  );
+  row.status = 'CANCELLED';
+  row.purchase_id = null;
+}
+
 const isLockFailure = (err) => err?.errno === 1213 || err?.errno === 1205;
 
 async function withRetry(work) {
@@ -218,6 +240,15 @@ export const confirmAction = (purchaseId) => async (row, conn) => {
   );
   if (used) return invalidState(row.status);
   return confirmLocked(conn, row, purchaseId);
+};
+
+export const revokeSaleAction = (purchaseId) => async (row, conn) => {
+  if (row.status === 'CONFIRMED') {
+    if (row.purchase_id !== purchaseId) return invalidState(row.status);
+    return revokeLocked(conn, row);
+  }
+  if (row.status === 'ACTIVE') return invalidState(row.status);
+  return null;
 };
 
 const itemNotValid = (index, field) =>

@@ -663,6 +663,55 @@ paths:
                 code: RESERVATION_ALREADY_CONFIRMED
                 message: La reserva ya fue pagada y no se puede cancelar
 
+  /internal/reservations/{reservationId}/revoke-sale:
+    parameters:
+      - $ref: '#/components/parameters/ReservationId'
+    post:
+      tags: [Internal]
+      operationId: internalRevokeSale
+      summary: Undo a confirmed sale whose capture was definitively declined (internal, CU-08)
+      description: |
+        **Internal** (service-to-service). Called by PurchaseService when the provider definitively
+        rejects the capture after `confirm-sale`. In one transaction: seats SOLD -> AVAILABLE,
+        `soldCount` goes down, reservation CONFIRMED -> CANCELLED and `purchaseId` is cleared.
+        Idempotent: a CANCELLED or EXPIRED reservation returns 200 without changes.
+      security:
+        - internalAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purchaseId]
+              properties:
+                purchaseId:
+                  $ref: './common.yaml#/components/schemas/Id'
+            example:
+              purchaseId: 8001
+      responses:
+        '200':
+          description: Sale revoked (or the reservation was already CANCELLED/EXPIRED).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ReservationNotFound'
+        '409':
+          description: The reservation is ACTIVE, or CONFIRMED by a different purchase.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: INVALID_RESERVATION_STATE
+                message: La reserva no se puede confirmar
+                details:
+                  status: CONFIRMED
+
   /internal/zones:
     get:
       tags: [Internal]
