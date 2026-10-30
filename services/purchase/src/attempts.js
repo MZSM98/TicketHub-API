@@ -5,6 +5,7 @@ import {
   authorize,
   cancel,
   capture,
+  findIntent,
   PaymentCaptureDeclinedError,
   PaymentIdempotencyError,
   providerName,
@@ -132,9 +133,16 @@ export async function sendAuthorization(claim, attempt, userId) {
   } catch (err) {
     if (err instanceof PaymentIdempotencyError) {
       console.error(
-        `Intento ${attempt.idempotency_key} marcado FAILED, no se reintentará: ${err.message}`,
+        `Intento ${attempt.idempotency_key} no se reintentará; se busca y cancela su autorización: ${err.message}`,
       );
-      await setStatus(claim, attempt, 'FAILED', err.message.slice(0, 255));
+      await setStatus(claim, attempt, 'CANCEL_PENDING', err.message.slice(0, 255));
+      await undoAttempt(claim, {
+        ...attempt,
+        status: 'CANCEL_PENDING',
+        last_error: err.message.slice(0, 255),
+      }).catch((undoErr) =>
+        console.error(`Recuperación de ${attempt.idempotency_key} pendiente: ${undoErr.message}`),
+      );
     } else {
       await touch(claim, attempt, err.message);
     }
@@ -302,7 +310,32 @@ async function setStatus(claim, attempt, status, error = null) {
   await updateAttempt(claim, attempt.id, 'a.status = ?, a.last_error = ?', [status, error]);
 }
 
+const RECOVERY_WINDOW_SECONDS = 300;
+
+async function recoverReference(claim, attempt) {
+  const found = await findIntent({
+    metadata: { reservation_id: attempt.reservation_id, attempt: attempt.attempt },
+    createdAfter: Math.floor(attempt.created_at.getTime() / 1000) - RECOVERY_WINDOW_SECONDS,
+  });
+  if (!found) return null;
+  await updateAttempt(claim, attempt.id, 'a.provider_reference = ?', [found.reference]);
+  return found.reference;
+}
+
 export async function undoAttempt(claim, attempt) {
+  if (!attempt.provider_reference) {
+    let reference;
+    try {
+      reference = await recoverReference(claim, attempt);
+    } catch (err) {
+      console.error(
+        `No se pudo buscar la autorización de ${attempt.idempotency_key}: ${err.message}`,
+      );
+      return setStatus(claim, attempt, 'CANCEL_PENDING', err.message.slice(0, 255));
+    }
+    if (!reference) return setStatus(claim, attempt, 'FAILED', attempt.last_error);
+    attempt = { ...attempt, provider_reference: reference };
+  }
   let status = attempt.status === 'REFUND_PENDING' ? 'REFUND_PENDING' : 'CANCEL_PENDING';
   if (status === 'CANCEL_PENDING') {
     await setStatus(claim, attempt, status);

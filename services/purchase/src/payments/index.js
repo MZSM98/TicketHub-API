@@ -17,4 +17,5 @@ export const providerName = provider.name;
 export const authorize = (request) => provider.authorize(request);
 export const capture = (request) => provider.capture(request);
 export const cancel = (request) => provider.cancel(request);
+export const findIntent = (request) => provider.findIntent(request);
 export const refund = (request) => provider.refund(request);

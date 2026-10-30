@@ -12,22 +12,29 @@ if (config.paymentProvider === name && config.stripe.secretKey.startsWith('sk_li
   throw new Error('STRIPE_SECRET_KEY debe ser una llave de modo prueba (sk_test_)');
 }
 
-async function post(path, params, idempotencyKey) {
+async function send(path, init) {
   let res;
   try {
     res = await fetch(`${config.stripe.apiBase}${path}`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${config.stripe.secretKey}`,
-        'content-type': 'application/x-www-form-urlencoded',
-        'idempotency-key': idempotencyKey,
-      },
-      body: new URLSearchParams(params).toString(),
+      ...init,
+      headers: { authorization: `Bearer ${config.stripe.secretKey}`, ...init.headers },
       signal: AbortSignal.timeout(config.stripe.timeoutMs),
     });
   } catch {
     throw new PaymentUnavailableError('Stripe no respondió');
   }
+  return res;
+}
+
+async function post(path, params, idempotencyKey) {
+  const res = await send(path, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'idempotency-key': idempotencyKey,
+    },
+    body: new URLSearchParams(params).toString(),
+  });
   if (res.status >= 500 || res.status === 429) {
     throw new PaymentUnavailableError(`Stripe respondió ${res.status}`);
   }
@@ -126,6 +133,35 @@ export async function capture({ reference, idempotencyKey }) {
     throw new PaymentCaptureDeclinedError(`Stripe rechazó la captura (${status} ${code})`, code);
   }
   throw new PaymentUnavailableError(`Stripe respondió ${status} al capturar`);
+}
+
+const LIST_PAGES = 10;
+
+export async function findIntent({ metadata, createdAfter }) {
+  let startingAfter = null;
+  for (let page = 0; page < LIST_PAGES; page++) {
+    const query = new URLSearchParams({ limit: '100', 'created[gte]': String(createdAfter) });
+    if (startingAfter) query.set('starting_after', startingAfter);
+    const res = await send(`/v1/payment_intents?${query}`, { method: 'GET', headers: {} });
+    if (res.status !== 200)
+      throw new PaymentUnavailableError(`Stripe respondió ${res.status} al listar`);
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      throw new PaymentUnavailableError('Respuesta de Stripe inválida al listar');
+    }
+    if (body?.object !== 'list' || !Array.isArray(body.data)) {
+      throw new PaymentUnavailableError('Respuesta de Stripe inválida al listar');
+    }
+    const match = body.data.find((intent) =>
+      Object.entries(metadata).every(([key, value]) => intent.metadata?.[key] === String(value)),
+    );
+    if (match) return { reference: match.id, status: match.status };
+    if (!body.has_more || body.data.length === 0) return null;
+    startingAfter = body.data[body.data.length - 1].id;
+  }
+  throw new PaymentUnavailableError('Demasiados PaymentIntents para buscar el intento');
 }
 
 export async function cancel({ reference, idempotencyKey }) {
