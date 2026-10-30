@@ -5,11 +5,12 @@ import {
   authorize,
   cancel,
   capture,
+  PaymentCaptureDeclinedError,
   PaymentIdempotencyError,
-  PaymentProviderError,
   providerName,
   refund,
 } from './payments/index.js';
+import { revokeSale } from './services.js';
 
 export class ClaimLostError extends Error {
   constructor() {
@@ -190,15 +191,68 @@ export async function captureAttempt(claim, attempt) {
   }
 }
 
-export async function captureOrMarkFailed(claim, attempt) {
+async function markCaptureDeclined(claim, attempt, err) {
+  await updateAttempt(
+    claim,
+    attempt.id,
+    "a.status = 'CAPTURE_FAILED', a.decline_code = ?, a.last_error = ?",
+    [String(err.code ?? 'capture_declined').slice(0, 100), err.message.slice(0, 255)],
+  );
+}
+
+async function markVoided(claim, attempt) {
+  await transaction(async (conn) => {
+    await updateAttempt(claim, attempt.id, "a.status = 'CANCELED', a.last_error = NULL", [], conn);
+    ensureHeld(
+      await query(
+        `UPDATE purchases SET status = 'DECLINED', failed_attempts = failed_attempts + 1
+          WHERE id = ? AND status <> 'PAID' AND ${CLAIM_HELD}`,
+        [attempt.purchase_id, claim.token],
+        conn,
+      ),
+    );
+  });
+}
+
+export async function voidDeclinedCapture(claim, attempt) {
+  let outcome;
+  try {
+    outcome = await cancel({
+      reference: attempt.provider_reference,
+      idempotencyKey: `${attempt.idempotency_key}-cancel`,
+    });
+  } catch (err) {
+    console.error(
+      `No se pudo cancelar ${attempt.provider_reference} tras la captura rechazada: ${err.message}`,
+    );
+    await touch(claim, attempt, err.message);
+    return 'pending';
+  }
+  if (outcome === 'captured') {
+    console.error(`${attempt.provider_reference} sí quedó capturado; se concilia como venta`);
+    await setStatus(claim, attempt, 'AUTHORIZED', 'Stripe reporta la captura como hecha');
+    return 'captured';
+  }
+  const revoked = await revokeSale(attempt.reservation_id, attempt.purchase_id).catch(() => false);
+  if (!revoked) {
+    console.error(`No se pudo liberar la reserva ${attempt.reservation_id}; se reintentará`);
+    await touch(claim, attempt, 'Inventory no liberó la venta');
+    return 'pending';
+  }
+  await markVoided(claim, attempt);
+  return 'voided';
+}
+
+export async function captureOrVoid(claim, attempt) {
   try {
     await captureAttempt(claim, attempt);
   } catch (err) {
-    if (err instanceof PaymentProviderError) {
+    if (err instanceof PaymentCaptureDeclinedError) {
       console.error(
-        `Captura rechazada de ${attempt.provider_reference} (compra ${attempt.purchase_id}); la venta queda confirmada y requiere revisión: ${err.message}`,
+        `Captura rechazada de ${attempt.provider_reference} (compra ${attempt.purchase_id}); se cancela la autorización y se liberan los asientos: ${err.message}`,
       );
-      await setStatus(claim, attempt, 'CAPTURE_FAILED', err.message.slice(0, 255));
+      await markCaptureDeclined(claim, attempt, err);
+      if ((await voidDeclinedCapture(claim, attempt)) === 'captured') return;
     }
     throw err;
   }

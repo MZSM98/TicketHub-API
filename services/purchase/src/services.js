@@ -49,6 +49,15 @@ export async function confirmSale(reservationId, purchaseId) {
   );
 }
 
+export async function revokeSale(reservationId, purchaseId) {
+  const { status } = await internalCall(
+    config.services.inventory,
+    `/internal/reservations/${reservationId}/revoke-sale`,
+    { method: 'POST', body: { purchaseId } },
+  );
+  return status === 200;
+}
+
 export async function releaseReservation(reservationId) {
   const { status } = await internalCall(
     config.services.inventory,

@@ -2,19 +2,26 @@ import { query } from '@tickethub/common/db';
 import { forbidden, HttpError, serviceUnavailable } from '@tickethub/common/http';
 import { config } from './config.js';
 import {
-  captureOrMarkFailed,
+  captureOrVoid,
   ClaimLostError,
   claimPurchase,
   completePurchase,
   createAttempt,
+  findAttempt,
   latestAttempt,
   openAttempt,
   recordAuthorization,
   releaseClaim,
   sendAuthorization,
   undoAttempt,
+  voidDeclinedCapture,
 } from './attempts.js';
-import { PaymentProviderError, PaymentUnavailableError, providerName } from './payments/index.js';
+import {
+  PaymentCaptureDeclinedError,
+  PaymentProviderError,
+  PaymentUnavailableError,
+  providerName,
+} from './payments/index.js';
 import { confirmSale, getReservation, releaseReservation } from './services.js';
 import { issueFor } from './tickets.js';
 
@@ -32,6 +39,13 @@ const attemptsExhausted = () =>
     402,
     'PAYMENT_ATTEMPTS_EXHAUSTED',
     'Pago declinado. Se agotaron los intentos y los asientos fueron liberados',
+    { attemptsRemaining: 0 },
+  );
+const captureDeclined = () =>
+  new HttpError(
+    402,
+    'PAYMENT_ATTEMPTS_EXHAUSTED',
+    'Pago rechazado por la pasarela. No se hizo ningún cargo y los asientos fueron liberados',
     { attemptsRemaining: 0 },
   );
 const declined = (attemptsRemaining, providerDeclineCode) =>
@@ -83,6 +97,10 @@ function saleFailure(status) {
   return serviceUnavailable();
 }
 
+const isCaptureDeclined = (attempt) =>
+  attempt?.status === 'CAPTURE_FAILED' ||
+  (attempt?.status === 'CANCELED' && attempt.decline_code !== null);
+
 async function preflight(userId, reservationId) {
   const reservation = await getReservation(reservationId);
   if (!reservation) throw reservationNotFound();
@@ -95,6 +113,7 @@ async function preflight(userId, reservationId) {
   if (reservation.status === 'EXPIRED') throw reservationExpired();
   if (reservation.status !== 'ACTIVE') {
     const row = await findByReservation(reservationId);
+    if (row && isCaptureDeclined(await latestAttempt(row.id))) throw captureDeclined();
     if (row && row.failed_attempts >= config.paymentMaxAttempts) throw attemptsExhausted();
     throw reservationNotActive();
   }
@@ -170,9 +189,11 @@ async function finalize(claim, attempt, reservation) {
   }
   if (sale.status !== 200) throw serviceUnavailable();
   try {
-    await captureOrMarkFailed(claim, attempt);
+    await captureOrVoid(claim, attempt);
   } catch (err) {
-    throw providerFailure(err);
+    if (err instanceof PaymentCaptureDeclinedError) throw captureDeclined();
+    if (err instanceof PaymentUnavailableError) throw gatewayUnavailable();
+    throw err;
   }
   await completePurchase(claim, attempt, reservation.items);
 }
@@ -180,7 +201,10 @@ async function finalize(claim, attempt, reservation) {
 async function finishConfirmedSale(claim, reservation) {
   const attempt = await latestAttempt(claim.purchaseId);
   if (attempt?.status === 'AUTHORIZED') return finalize(claim, attempt, reservation);
-  if (attempt?.status === 'CAPTURE_FAILED') throw gatewayError();
+  if (attempt?.status === 'CAPTURE_FAILED') {
+    if ((await voidDeclinedCapture(claim, attempt)) !== 'captured') throw captureDeclined();
+    return finalize(claim, await findAttempt(attempt.id), reservation);
+  }
   throw serviceUnavailable();
 }
 
