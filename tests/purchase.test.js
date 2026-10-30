@@ -131,7 +131,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     );
     s.buyers = [];
     s.buyerIds = [];
-    for (let i = 0; i < 19; i++) {
+    for (let i = 0; i < 23; i++) {
       const account = { name: `Comprador ${i}`, email: email(`pur-${i}`), password: 'S3gura!2026' };
       s.buyerIds.push((await expectContract('POST', '/auth/register', 201, { body: account })).id);
       s.buyers.push((await login(account.email, account.password)).accessToken);
@@ -701,7 +701,22 @@ describe('PurchaseService (purchase.yaml)', () => {
     );
   });
 
-  test('la captura falla siempre: nunca SOLD + reembolso; rechazo definitivo queda CAPTURE_FAILED (502) para revisión', async () => {
+  const salesOf = () =>
+    expectContract(
+      'GET',
+      `/events/${s.event.id}/sales`,
+      200,
+      { token: s.org.token },
+      '/events/{eventId}/sales',
+    );
+  const revokeSale = (reservationId, purchaseId) =>
+    call('POST', `/internal/reservations/${reservationId}/revoke-sale`, {
+      base: INVENTORY,
+      headers: internal,
+      body: { purchaseId },
+    });
+
+  test('captura transitoria se reintenta sin liberar; rechazo definitivo cancela la autorización y libera el asiento', async () => {
     const token = s.buyers[12];
     const reservation = await reserve(token, [seat(12)]);
     fakes.stripe.captureFailures.set(reservation.id, { mode: '503', times: Infinity });
@@ -713,24 +728,113 @@ describe('PurchaseService (purchase.yaml)', () => {
       'el barrido reintenta',
     );
     assert.equal(charge.status, 'requires_capture');
-    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0);
+    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0, 'lo transitorio no libera');
     assert.equal(await seatStatus(s.seats[12]), 'SOLD');
+    const confirmed = await internalReservation(reservation.id);
+    const sold = await salesOf();
     fakes.stripe.captureFailures.set(reservation.id, { mode: '400', times: Infinity });
-    const definitive = await pay(token, reservation.id, 'pm_card_visa', 502);
-    assert.equal(definitive.code, 'PAYMENT_GATEWAY_ERROR');
+    const definitive = await pay(token, reservation.id, 'pm_card_visa', 402);
+    assert.deepEqual(
+      [definitive.code, definitive.details],
+      ['PAYMENT_ATTEMPTS_EXHAUSTED', { attemptsRemaining: 0 }],
+    );
+    assert.equal(charge.status, 'canceled', 'la autorización se canceló en Stripe');
+    assert.equal(orphansOf(reservation.id).length, 0);
+    assert.equal(netChargesOf(reservation.id).length, 0);
+    assert.equal(refundsOf(charge), 0);
+    assert.equal(await seatStatus(s.seats[12]), 'AVAILABLE');
+    const released = await internalReservation(reservation.id);
+    assert.deepEqual([released.status, released.purchaseId], ['CANCELLED', null]);
+    const after = await salesOf();
+    assert.equal(after.ticketsSold, sold.ticketsSold - 1);
+    assert.equal(after.purchases, sold.purchases);
+    assert.equal(after.grossRevenue, sold.grossRevenue);
+    const purchase = await expectContract(
+      'GET',
+      `/purchases/${confirmed.purchaseId}`,
+      200,
+      { token },
+      '/purchases/{purchaseId}',
+    );
+    assert.deepEqual([purchase.status, purchase.failedAttempts], ['DECLINED', 1]);
     const captures = requestsTo('capture', charge);
     await sleep(6000);
-    assert.equal(requestsTo('capture', charge), captures, 'CAPTURE_FAILED ya no se reintenta');
-    const after = await pay(token, reservation.id, 'pm_card_visa', 502);
-    assert.equal(after.code, 'PAYMENT_GATEWAY_ERROR');
-    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0, 'nunca se deshace');
-    assert.equal(netChargesOf(reservation.id).length, 0);
-    assert.equal(await seatStatus(s.seats[12]), 'SOLD');
-    const mine = await expectContract('GET', '/purchases/me', 200, { token });
-    assert.equal(mine.totalItems, 0);
+    assert.equal(requestsTo('capture', charge), captures, 'ya no se reintenta la captura');
+    const again = await pay(token, reservation.id, 'pm_card_visa', 402);
+    assert.equal(again.code, 'PAYMENT_ATTEMPTS_EXHAUSTED');
+    assert.equal(chargesOf(reservation.id).length, 1, 'sin un segundo cobro');
+    const replay = await revokeSale(reservation.id, confirmed.purchaseId);
+    assert.equal(replay.res.status, 200, 'revoke-sale es idempotente');
+    assert.equal(replay.body.status, 'CANCELLED');
+    const other = await reserve(s.buyers[19], [seat(12)]);
+    const active = await revokeSale(other.id, confirmed.purchaseId);
+    assert.deepEqual([active.res.status, active.body.code], [409, 'INVALID_RESERVATION_STATE']);
+    await expectContract(
+      'POST',
+      `/reservations/${other.id}/cancel`,
+      200,
+      { token: s.buyers[19] },
+      '/reservations/{reservationId}/cancel',
+    );
     fakes.stripe.captureFailures.delete(reservation.id);
     console.log(
-      `[captura siempre falla] capturas=${requestsTo('capture', charge)} cancelaciones=0 reembolsos=0 asiento=SOLD compra no PAID`,
+      `[captura rechazada] capturas=${captures} cancelaciones=${requestsTo('cancel', charge)} asiento=AVAILABLE ticketsSold ${sold.ticketsSold}->${after.ticketsSold} compra=${purchase.status}`,
+    );
+  });
+
+  test('captura rechazada con la cancelación caída: el barrido cancela y libera después', async () => {
+    const token = s.buyers[20];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 2 }]);
+    const sold = (await salesOf()).ticketsSold;
+    fakes.stripe.captureFailures.set(reservation.id, { mode: '400', times: Infinity });
+    fakes.stripe.failCancels = true;
+    let declined;
+    try {
+      declined = await pay(token, reservation.id, 'pm_card_visa', 402);
+    } finally {
+      fakes.stripe.failCancels = false;
+    }
+    assert.equal(declined.code, 'PAYMENT_ATTEMPTS_EXHAUSTED');
+    const [charge] = chargesOf(reservation.id);
+    assert.equal(charge.status, 'requires_capture', 'la cancelación falló');
+    assert.equal((await internalReservation(reservation.id)).status, 'CONFIRMED');
+    assert.equal((await salesOf()).ticketsSold, sold + 2);
+    const started = Date.now();
+    assert.ok(await waitFor(() => charge.status === 'canceled'), 'el barrido canceló');
+    let reservationNow;
+    for (let i = 0; i < 20; i++) {
+      reservationNow = await internalReservation(reservation.id);
+      if (reservationNow.status === 'CANCELLED') break;
+      await sleep(300);
+    }
+    assert.equal(reservationNow.status, 'CANCELLED', 'el barrido liberó la venta');
+    assert.equal((await salesOf()).ticketsSold, sold);
+    assert.equal(orphansOf(reservation.id).length, 0);
+    fakes.stripe.captureFailures.delete(reservation.id);
+    console.log(
+      `[captura rechazada + cancelación caída] resuelta por el barrido en ${Date.now() - started} ms`,
+    );
+  });
+
+  test('captura con respuesta 200 no JSON es transitoria: no libera y el barrido la completa a PAID', async () => {
+    const token = s.buyers[21];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    fakes.stripe.captureFailures.set(reservation.id, { mode: 'garbage', times: 2 });
+    const failed = await pay(token, reservation.id, 'pm_card_visa', 503);
+    assert.equal(failed.code, 'PAYMENT_GATEWAY_UNAVAILABLE');
+    const [charge] = chargesOf(reservation.id);
+    assert.equal((await internalReservation(reservation.id)).status, 'CONFIRMED');
+    const isPaid = async () =>
+      (await expectContract('GET', '/purchases/me', 200, { token })).items[0]?.status === 'PAID';
+    const started = Date.now();
+    while (!(await isPaid()) && Date.now() - started < 20000) await sleep(300);
+    assert.ok(await isPaid(), 'el barrido reintentó la captura');
+    assert.equal(requestsTo('cancel', charge) + refundsOf(charge), 0);
+    assert.equal(netChargesOf(reservation.id).length, 1);
+    assert.ok(requestsTo('capture', charge) >= 3);
+    fakes.stripe.captureFailures.delete(reservation.id);
+    console.log(
+      `[captura no JSON] PAID tras ${requestsTo('capture', charge)} capturas en ${Date.now() - started} ms`,
     );
   });
 
@@ -755,6 +859,26 @@ describe('PurchaseService (purchase.yaml)', () => {
       [key1, `tickethub-reservation-${reservation.id}-attempt-2`],
     );
     assert.equal(netChargesOf(reservation.id).length, 1);
+  });
+
+  test('400 idempotency_error con la autorización ya creada: se recupera por metadata y se cancela', async () => {
+    const token = s.buyers[22];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    fakes.stripe.idempotencyErrorAfterAuthorize.add(reservation.id);
+    const listsBefore = fakes.stripe.lists ?? 0;
+    const failed = await pay(token, reservation.id, 'pm_card_visa', 502);
+    assert.equal(failed.code, 'PAYMENT_GATEWAY_ERROR');
+    const [orphan] = chargesOf(reservation.id);
+    assert.ok(orphan, 'Stripe sí creó la autorización');
+    assert.ok((fakes.stripe.lists ?? 0) > listsBefore, 'se buscó el PaymentIntent');
+    assert.equal(orphan.status, 'canceled', 'la autorización huérfana se canceló');
+    assert.equal(requestsTo('cancel', orphan), 1);
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.failedAttempts, 0);
+    assert.notEqual(ok.purchase.paymentReference, orphan.id);
+    assert.equal(netChargesOf(reservation.id).length, 1);
+    assert.equal(orphansOf(reservation.id).length, 0);
+    console.log(`[idempotency_error recuperado] ${orphan.id} cancelada; huérfanas=0`);
   });
 
   test('reclamo vencido: la escritura del proceso que lo perdió se rechaza y el rechazo cuenta una sola vez', async () => {
@@ -807,6 +931,18 @@ describe('PurchaseService (purchase.yaml)', () => {
       console.log(
         `[boletos sin inanición] emitida en ${Date.now() - started} ms; llamadas a compras atascadas=${stuckCalls}`,
       );
+      const callsOf = (id) => fakes.tickets.calls.filter((c) => c.purchaseId === id).length;
+      assert.ok(
+        await waitFor(() => stuck.every((id) => callsOf(id) >= 5), 40000),
+        'las atascadas llegan a TICKET_RETRY_MAX_ATTEMPTS',
+      );
+      await sleep(10000);
+      assert.deepEqual(
+        stuck.map(callsOf),
+        [5, 5, 5],
+        'tras el último intento quedan FAILED y no se reintentan',
+      );
+      console.log(`[boletos FAILED] llamadas por compra atascada=${stuck.map(callsOf).join(',')}`);
     } finally {
       fakes.tickets.up = true;
       for (const id of stuck) fakes.tickets.failFor.delete(id);
