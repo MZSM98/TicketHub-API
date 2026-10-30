@@ -43,7 +43,7 @@ async function health(_req, res) {
   const names = Object.keys(serviceUrls);
   const statuses = await Promise.all(names.map((name) => serviceStatus(serviceUrls[name])));
   const services = Object.fromEntries(names.map((name, i) => [name, statuses[i]]));
-  res.json({ status: 'UP', services });
+  res.json({ status: statuses.includes('DOWN') ? 'DEGRADED' : 'UP', services });
 }
 
 app.get('/health', health);
