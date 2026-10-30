@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { BlockList, isIP } from 'node:net';
 
 export const GATEWAY_SECRET_HEADER = 'x-tickethub-gateway';
 const API_PREFIX = '/api/v1';
@@ -18,11 +19,40 @@ export function parseHost(value) {
   return { host: value.toLowerCase(), hostname: match[1].toLowerCase() };
 }
 
+export function parseCidr(entry) {
+  const match = /^([^/]+)\/(\d{1,3})$/.exec(entry);
+  const family = match ? isIP(match[1]) : 0;
+  const prefix = match ? Number(match[2]) : NaN;
+  if (!family || prefix > (family === 4 ? 32 : 128)) return null;
+  return { address: match[1], prefix, type: family === 4 ? 'ipv4' : 'ipv6' };
+}
+
 export function parseAllowedHosts(value) {
-  return (value ?? '')
-    .split(',')
-    .map((host) => host.trim().toLowerCase())
-    .filter(Boolean);
+  const names = [];
+  const ranges = new BlockList();
+  let rangeCount = 0;
+  for (const entry of (value ?? '').split(',').map((host) => host.trim().toLowerCase())) {
+    if (!entry) continue;
+    if (!entry.includes('/')) {
+      names.push(entry);
+      continue;
+    }
+    const cidr = parseCidr(entry);
+    if (!cidr) throw new Error(`PUBLIC_HOSTS_ALLOWED tiene un rango inválido: ${entry}`);
+    ranges.addSubnet(cidr.address, cidr.prefix, cidr.type);
+    rangeCount++;
+  }
+  return { names, ranges, empty: names.length === 0 && rangeCount === 0 };
+}
+
+const NO_RESTRICTION = parseAllowedHosts('');
+
+function isAllowed(hostname, allowed) {
+  if (allowed.empty) return true;
+  if (allowed.names.includes(hostname)) return true;
+  const ip = hostname.replace(/^\[|\]$/g, '');
+  const family = isIP(ip);
+  return family !== 0 && allowed.ranges.check(ip, family === 4 ? 'ipv4' : 'ipv6');
 }
 
 function sameSecret(sent, expected) {
@@ -32,12 +62,12 @@ function sameSecret(sent, expected) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function publicBaseUrl(headers, { fallback, gatewaySecret, allowedHosts = [] }) {
+export function publicBaseUrl(headers, { fallback, gatewaySecret, allowedHosts = NO_RESTRICTION }) {
   if (!sameSecret(headers[GATEWAY_SECRET_HEADER], gatewaySecret)) return fallback;
   const proto = headers['x-forwarded-proto'];
   if (proto !== 'http' && proto !== 'https') return fallback;
   const parsed = parseHost(headers['x-forwarded-host']);
   if (!parsed) return fallback;
-  if (allowedHosts.length > 0 && !allowedHosts.includes(parsed.hostname)) return fallback;
+  if (!isAllowed(parsed.hostname, allowedHosts)) return fallback;
   return `${proto}://${parsed.host}${API_PREFIX}`;
 }

@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { forwardBody, limitBody } from './body-limit.js';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
+import { parseTrustedProxies } from './trust.js';
 import { checkJwtSecret, checkSecret } from './secret.js';
 import { serverTimeouts } from './timeouts.js';
 
@@ -13,9 +14,9 @@ const port = Number(process.env.PORT ?? 8080);
 const jwtSecret = checkJwtSecret(process.env.JWT_SECRET);
 const forwardSecret = checkSecret('GATEWAY_FORWARD_SECRET', process.env.GATEWAY_FORWARD_SECRET);
 const timeouts = serverTimeouts(process.env);
-// Sin respuesta del servicio en este tiempo, el gateway responde 503.
+const isTrustedProxy = parseTrustedProxies(process.env.TRUST_PROXY);
+const SERVICES_WITH_FORWARD_SECRET = new Set(['catalog']);
 const PROXY_TIMEOUT_MS = 15_000;
-// El timeout del agente también cubre la conexión TCP; proxyTimeout solo cuenta ya conectado.
 const proxyAgent = new http.Agent({ keepAlive: true, timeout: PROXY_TIMEOUT_MS });
 
 const serviceUrls = {
@@ -54,7 +55,6 @@ function sendError(res, status, code, message) {
   res.end(JSON.stringify({ code, message }));
 }
 
-// Un proxy por servicio. La ruta llega intacta (/api/v1/...) al servicio, como en los contratos.
 const proxies = Object.fromEntries(
   Object.entries(serviceUrls).map(([name, target]) => [
     name,
@@ -65,7 +65,6 @@ const proxies = Object.fromEntries(
       proxyTimeout: PROXY_TIMEOUT_MS,
       on: {
         proxyReq: forwardBody,
-        // Si un servicio está caído solo fallan sus rutas (RNF-03).
         error: (_err, _req, res) => {
           if (typeof res.writeHead !== 'function') return res.destroy();
           sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Servicio temporalmente inactivo');
@@ -75,10 +74,6 @@ const proxies = Object.fromEntries(
   ]),
 );
 
-/**
- * Revisa firma y expiración del access token (common.yaml bearerAuth). Los roles y la propiedad
- * de los recursos los revisa cada servicio; el header Authorization se reenvía sin cambios.
- */
 function hasValidToken(req) {
   const match = /^Bearer (.+)$/i.exec(req.get('authorization') ?? '');
   if (!match) return false;
@@ -103,9 +98,12 @@ app.use(API_PREFIX, (req, res, next) => {
       'Sesión no válida o expirada, inicie sesión de nuevo',
     );
   }
-  // Express quita el prefijo de req.url al montar; se restaura para reenviar la ruta completa.
   req.url = req.originalUrl;
-  rewriteForwarded(req, forwardSecret);
+  rewriteForwarded(req, {
+    secret: forwardSecret,
+    sendSecret: SERVICES_WITH_FORWARD_SECRET.has(service),
+    isTrustedProxy,
+  });
   return limitBody(req, res, () => proxies[service](req, res, next));
 });
 

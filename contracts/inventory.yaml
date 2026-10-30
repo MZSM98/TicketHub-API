@@ -438,7 +438,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './common.yaml#/components/schemas/Error'
+                oneOf:
+                  - $ref: '#/components/schemas/ActiveReservationExistsError'
+                  - $ref: '#/components/schemas/ReservationConflictError'
               examples:
                 seatUnavailable:
                   summary: Another buyer locked the seat first (CU-06 FA1)
@@ -877,6 +879,32 @@ components:
             code: RESERVATION_EXPIRED
             message: Tiempo agotado
   schemas:
+    ActiveReservationExistsError:
+      description: 409 `ACTIVE_RESERVATION_EXISTS`. `details.reservationId` is the buyer's ACTIVE reservation.
+      allOf:
+        - $ref: './common.yaml#/components/schemas/Error'
+        - type: object
+          required: [code, details]
+          properties:
+            code:
+              type: string
+              enum: [ACTIVE_RESERVATION_EXISTS]
+            details:
+              type: object
+              required: [reservationId]
+              additionalProperties: false
+              properties:
+                reservationId:
+                  $ref: './common.yaml#/components/schemas/Id'
+    ReservationConflictError:
+      description: 409 `SEAT_UNAVAILABLE` or `ZONE_CAPACITY_EXCEEDED` when creating a reservation.
+      allOf:
+        - $ref: './common.yaml#/components/schemas/Error'
+        - type: object
+          properties:
+            code:
+              type: string
+              enum: [SEAT_UNAVAILABLE, ZONE_CAPACITY_EXCEEDED]
     ZoneType:
       type: string
       enum: [NUMBERED, GENERAL]
