@@ -1010,7 +1010,11 @@ components:
           type: string
           format: uri
           nullable: true
-          description: Gateway URL of the poster (built from `poster_key`); null if there is no poster.
+          description: |
+            Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is
+            built from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and
+            `X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are
+            missing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.
         venue:
           $ref: '#/components/schemas/Venue'
         createdAt:
