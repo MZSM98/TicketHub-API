@@ -22,7 +22,7 @@ const BUYERS = 50;
 const internal = { 'x-internal-token': INTERNAL_TOKEN };
 const RESERVATION_SCHEMA = responseSchema('GET', '/api/v1/reservations/{reservationId}', 200);
 const ZONES_SCHEMA = responseSchema('GET', '/api/v1/events/{eventId}/zones', 200);
-const ERROR_SCHEMA = responseSchema('POST', '/api/v1/reservations', 409);
+const ERROR_SCHEMA = responseSchema('POST', '/api/v1/reservations', 400);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const inDays = (days) =>
   new Date(Date.now() + days * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
