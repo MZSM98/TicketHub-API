@@ -3,6 +3,7 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import { forwardBody, limitBody } from './body-limit.js';
+import { onClientError } from './client-error.js';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
 import { parseTrustedProxies } from './trust.js';
@@ -117,6 +118,7 @@ const server = http.createServer(
   },
   app,
 );
+server.on('clientError', onClientError);
 server.listen(port, () => {
   console.log(
     `gateway escuchando en el puerto ${port} (requestTimeout ${timeouts.requestTimeoutMs} ms, headersTimeout ${timeouts.headersTimeoutMs} ms)`,
