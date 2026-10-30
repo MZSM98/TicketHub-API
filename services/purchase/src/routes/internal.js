@@ -15,3 +15,25 @@ router.get('/internal/stats/sales', requireInternal, async (_req, res) => {
     currency: 'MXN',
   });
 });
+
+router.get(
+  '/internal/purchases/:purchaseId/payment-attempts',
+  requireInternal,
+  async (req, res) => {
+    const rows = await query(
+      `SELECT attempt, status, decline_code, last_error, recovery_attempts, updated_at
+       FROM payment_attempts WHERE purchase_id = ? ORDER BY attempt`,
+      [Number(req.params.purchaseId) || 0],
+    );
+    res.json({
+      items: rows.map((row) => ({
+        attempt: row.attempt,
+        status: row.status,
+        declineCode: row.decline_code,
+        lastError: row.last_error,
+        recoveryAttempts: row.recovery_attempts,
+        updatedAt: row.updated_at.toISOString().replace(/\.\d+Z$/, 'Z'),
+      })),
+    });
+  },
+);
