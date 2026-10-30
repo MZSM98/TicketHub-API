@@ -57,7 +57,7 @@ if [ "$ROLE" = "vm1" ]; then
     curl -fs http://127.0.0.1:8080/health >/dev/null 2>&1 && break
     sleep 5
   done
-  $COMPOSE exec -T identity-service npm run --silent create-admin || true
+  $COMPOSE exec -T identity-service npm run --silent create-admin
 fi
 
 $COMPOSE ps
