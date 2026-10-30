@@ -6,11 +6,13 @@ import { forwardBody, limitBody } from './body-limit.js';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
 import { checkJwtSecret, checkSecret } from './secret.js';
+import { serverTimeouts } from './timeouts.js';
 
 const API_PREFIX = '/api/v1';
 const port = Number(process.env.PORT ?? 8080);
 const jwtSecret = checkJwtSecret(process.env.JWT_SECRET);
 const forwardSecret = checkSecret('GATEWAY_FORWARD_SECRET', process.env.GATEWAY_FORWARD_SECRET);
+const timeouts = serverTimeouts(process.env);
 // Sin respuesta del servicio en este tiempo, el gateway responde 503.
 const PROXY_TIMEOUT_MS = 15_000;
 // El timeout del agente también cubre la conexión TCP; proxyTimeout solo cuenta ya conectado.
@@ -109,8 +111,18 @@ app.use(API_PREFIX, (req, res, next) => {
 
 app.use((_req, res) => sendError(res, 404, 'NOT_FOUND', 'Recurso no encontrado'));
 
-const server = app.listen(port, () => {
-  console.log(`gateway escuchando en el puerto ${port}`);
+const server = http.createServer(
+  {
+    requestTimeout: timeouts.requestTimeoutMs,
+    headersTimeout: timeouts.headersTimeoutMs,
+    connectionsCheckingInterval: timeouts.checkIntervalMs,
+  },
+  app,
+);
+server.listen(port, () => {
+  console.log(
+    `gateway escuchando en el puerto ${port} (requestTimeout ${timeouts.requestTimeoutMs} ms, headersTimeout ${timeouts.headersTimeoutMs} ms)`,
+  );
 });
 
 process.on('SIGTERM', () => server.close(() => process.exit(0)));
