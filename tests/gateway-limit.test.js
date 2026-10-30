@@ -54,7 +54,7 @@ describe('límite de 100 KB en el gateway', () => {
       const chunk = Buffer.alloc(16 * 1024, 'x');
       const pump = () => {
         if (req.destroyed) return;
-        if (sent >= 10 * 1024 * 1024) return req.end();
+        if (sent >= 64 * 1024 * 1024) return req.end();
         sent += chunk.length;
         if (!req.write(chunk)) return req.once('drain', pump);
         setImmediate(pump);
@@ -63,7 +63,7 @@ describe('límite de 100 KB en el gateway', () => {
     });
     assert.equal(result.status, 413);
     assert.equal(result.body.code, 'PAYLOAD_TOO_LARGE');
-    assert.ok(sent < 10 * 1024 * 1024, `el gateway cortó el stream (enviados ${sent} bytes)`);
+    assert.ok(sent < 64 * 1024 * 1024, `el gateway cortó el stream (enviados ${sent} bytes)`);
   });
 
   test('cuerpo chunked dentro del límite llega al servicio', async () => {

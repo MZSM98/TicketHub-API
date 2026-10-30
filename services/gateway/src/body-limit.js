@@ -6,8 +6,8 @@ const hasBody = (req) =>
 
 const isMultipart = (req) => /^multipart\/form-data/i.test(req.headers['content-type'] ?? '');
 
-const DRAIN_LIMIT_BYTES = 1024 * 1024;
-const DRAIN_TIMEOUT_MS = 1000;
+const DRAIN_LIMIT_BYTES = 16 * 1024 * 1024;
+const DRAIN_TIMEOUT_MS = 2000;
 
 function cutAfterResponse(req, res) {
   let drained = 0;
