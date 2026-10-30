@@ -12283,6 +12283,7 @@
                   "userId": 101,
                   "eventId": 12,
                   "status": "ACTIVE",
+                  "purchaseId": null,
                   "createdAt": "2026-10-26T15:40:00Z",
                   "expiresAt": "2026-10-26T15:50:00Z",
                   "secondsRemaining": 600,
