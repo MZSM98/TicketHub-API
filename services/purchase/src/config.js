@@ -28,6 +28,7 @@ export const config = {
   ticketRetryBackoffSeconds: positiveNumber('TICKET_RETRY_BACKOFF_SECONDS', 30),
   ticketRetryMaxSeconds: positiveNumber('TICKET_RETRY_MAX_SECONDS', 3600),
   ticketRetryBatch: atLeastOne('TICKET_RETRY_BATCH', 50),
+  ticketRetryMaxAttempts: atLeastOne('TICKET_RETRY_MAX_ATTEMPTS', 50),
   paymentSweepMs: positiveNumber('PAYMENT_SWEEP_SECONDS', 60) * 1000,
   reconcileAfterSeconds: positiveNumber('PAYMENT_RECONCILE_AFTER_SECONDS', 60),
   stripe: {

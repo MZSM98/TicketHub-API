@@ -2,6 +2,8 @@ import { query } from '@tickethub/common/db';
 import { config } from './config.js';
 import { issueTickets } from './services.js';
 
+const MAX_BACKOFF_EXPONENT = 30;
+
 async function payloadOf(purchaseId) {
   const [purchase] = await query('SELECT id, user_id, event_id FROM purchases WHERE id = ?', [
     purchaseId,
@@ -26,10 +28,25 @@ async function scheduleRetry(purchaseId) {
   await query(
     `UPDATE purchases
         SET ticket_attempts = ticket_attempts + 1,
-            ticket_next_retry_at = DATE_ADD(NOW(3), INTERVAL LEAST(? * POW(2, ticket_attempts), ?) SECOND)
+            ticket_issuance = IF(ticket_attempts >= ?, 'FAILED', 'PENDING'),
+            ticket_next_retry_at = DATE_ADD(NOW(3), INTERVAL LEAST(? * POW(2, LEAST(ticket_attempts, ?)), ?) SECOND)
       WHERE id = ? AND ticket_issuance = 'PENDING'`,
-    [config.ticketRetryBackoffSeconds, config.ticketRetryMaxSeconds, purchaseId],
+    [
+      config.ticketRetryMaxAttempts,
+      config.ticketRetryBackoffSeconds,
+      MAX_BACKOFF_EXPONENT,
+      config.ticketRetryMaxSeconds,
+      purchaseId,
+    ],
   );
+  const [row] = await query('SELECT ticket_issuance, ticket_attempts FROM purchases WHERE id = ?', [
+    purchaseId,
+  ]);
+  if (row?.ticket_issuance === 'FAILED') {
+    console.error(
+      `Emisión de boletos de la compra ${purchaseId} marcada FAILED tras ${row.ticket_attempts} intentos; requiere revisión`,
+    );
+  }
 }
 
 export async function issueFor(purchaseId) {

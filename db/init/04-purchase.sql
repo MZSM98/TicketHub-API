@@ -16,7 +16,7 @@ CREATE TABLE purchases (
   payment_reference VARCHAR(255)    NULL COMMENT 'Id del cargo en el proveedor',
   status            ENUM('PAID', 'DECLINED') NOT NULL,
   failed_attempts   TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Máximo PAYMENT_MAX_ATTEMPTS (3)',
-  ticket_issuance   ENUM('PENDING', 'ISSUED') NULL,
+  ticket_issuance   ENUM('PENDING', 'ISSUED', 'FAILED') NULL,
   ticket_ids        JSON            NULL,
   ticket_attempts   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   ticket_next_retry_at DATETIME(3)  NULL,
