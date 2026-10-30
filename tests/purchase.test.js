@@ -881,29 +881,28 @@ describe('PurchaseService (purchase.yaml)', () => {
     console.log(`[idempotency_error recuperado] ${orphan.id} cancelada; huérfanas=0`);
   });
 
-  test('reclamo vencido: la escritura del proceso que lo perdió se rechaza y el rechazo cuenta una sola vez', async () => {
+  test('reclamo vencido: la escritura del proceso que lo perdió se rechaza y el barrido deja un solo cobro', async () => {
     const token = s.buyers[14];
     const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
     fakes.stripe.delayMs = 1300;
     let stale;
     try {
-      stale = await pay(token, reservation.id, 'pm_card_chargeDeclined', 503, PURCHASE_SHORTCLAIM);
+      stale = await pay(token, reservation.id, 'pm_card_visa', 503, PURCHASE_SHORTCLAIM);
     } finally {
       fakes.stripe.delayMs = 0;
     }
     assert.equal(stale.code, 'PAYMENT_GATEWAY_UNAVAILABLE', 'su escritura fue rechazada');
-    const key1 = `tickethub-reservation-${reservation.id}-attempt-1`;
-    assert.ok(
-      await waitFor(
-        () => intentRequestsOf(reservation.id).filter((r) => r.idempotencyKey === key1).length >= 2,
-      ),
-      'el barrido concilió el intento',
-    );
-    await sleep(500);
-    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
-    assert.equal(ok.purchase.failedAttempts, 1, 'el rechazo se contó una sola vez');
+    const isPaid = async () =>
+      (await expectContract('GET', '/purchases/me', 200, { token })).items.find(
+        (p) => p.reservationId === reservation.id,
+      )?.status === 'PAID';
+    const started = Date.now();
+    while (!(await isPaid()) && Date.now() - started < 20000) await sleep(300);
+    assert.ok(await isPaid(), 'el barrido completó la compra');
+    assert.equal(netChargesOf(reservation.id).length, 1, 'un solo cobro');
+    assert.equal(orphansOf(reservation.id).length, 0);
     console.log(
-      `[reclamo vencido] respuesta del proceso viejo 503; failedAttempts=${ok.purchase.failedAttempts}`,
+      `[reclamo vencido] respuesta del proceso viejo 503; PAID por el barrido en ${Date.now() - started} ms`,
     );
   });
 

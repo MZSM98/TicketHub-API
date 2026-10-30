@@ -48,10 +48,11 @@ services:
       STRIPE_API_BASE: http://tests:4100
       STRIPE_SECRET_KEY: sk_test_fake_tickethub
       STRIPE_TIMEOUT_MS: '1500'
+      INTERNAL_TIMEOUT_MS: '1500'
       TICKET_SERVICE_URL: http://tests:4100
       TICKET_RETRY_SECONDS: '0'
       PAYMENT_SWEEP_SECONDS: '0'
-      PAYMENT_CLAIM_SECONDS: '1'
+      PAYMENT_CLAIM_SECONDS: '2'
 
   inventory-sweep:
     extends: { file: docker-compose.yml, service: inventory-service }
