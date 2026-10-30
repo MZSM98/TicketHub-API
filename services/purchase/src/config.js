@@ -43,12 +43,21 @@ export const config = {
   },
 };
 
-function greaterThanZero(name) {
-  const value = Number(process.env[name]);
-  if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} debe ser mayor que 0`);
+export const minClaimSeconds = Math.floor(
+  Math.max(config.stripe.timeoutMs, config.internalTimeoutMs) / 1000 + 1,
+);
+
+function claimSeconds(name) {
+  const raw = process.env[name];
+  const value = Number(raw);
+  if (!/^\d+$/.test(raw) || value < minClaimSeconds) {
+    throw new Error(
+      `${name} debe ser un entero de al menos ${minClaimSeconds} segundos (mayor que STRIPE_TIMEOUT_MS e INTERNAL_TIMEOUT_MS)`,
+    );
+  }
   return value;
 }
 
 config.claimSeconds = process.env.PAYMENT_CLAIM_SECONDS
-  ? greaterThanZero('PAYMENT_CLAIM_SECONDS')
+  ? claimSeconds('PAYMENT_CLAIM_SECONDS')
   : Math.ceil((5 * config.stripe.timeoutMs + 2 * config.internalTimeoutMs) / 1000) + 10;
