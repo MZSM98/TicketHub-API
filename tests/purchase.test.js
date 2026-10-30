@@ -948,11 +948,15 @@ describe('PurchaseService (purchase.yaml)', () => {
     }
   });
 
-  const attemptsOf = async (purchaseId) => {
-    const { res, body } = await call('GET', `/internal/purchases/${purchaseId}/payment-attempts`, {
-      base: PURCHASE,
-      headers: internal,
-    });
+  const attemptsOf = async (reservationId) => {
+    const { res, body } = await call(
+      'GET',
+      `/internal/reservations/${reservationId}/payment-attempts`,
+      {
+        base: PURCHASE,
+        headers: internal,
+      },
+    );
     assert.equal(res.status, 200, JSON.stringify(body));
     return body.items;
   };
@@ -986,10 +990,7 @@ describe('PurchaseService (purchase.yaml)', () => {
       [after.ticketsSold, after.purchases, after.grossRevenue],
       [before.ticketsSold, before.purchases, before.grossRevenue],
     );
-    const purchase = (await expectContract('GET', '/purchases/me', 200, { token })).items.find(
-      (p) => p.reservationId === reservation.id,
-    );
-    const [attempt] = await attemptsOf(purchase.id);
+    const [attempt] = await attemptsOf(reservation.id);
     assert.deepEqual([attempt.status, attempt.recoveryAttempts], ['CANCELED', 0]);
     await sleep(6000);
     assert.equal(requestsTo('cancel', charge), 1, 'el barrido no vuelve a cancelar');
@@ -1018,11 +1019,10 @@ describe('PurchaseService (purchase.yaml)', () => {
       assert.match(declined.message, /siguen pendientes/);
       assert.doesNotMatch(declined.message, /fueron liberados/);
       const [charge] = chargesOf(reservation.id);
-      const { purchaseId } = await internalReservation(reservation.id);
       let attempt;
       const started = Date.now();
       while (Date.now() - started < 40000) {
-        [attempt] = await attemptsOf(purchaseId);
+        [attempt] = await attemptsOf(reservation.id);
         if (attempt.status === 'RECOVERY_FAILED') break;
         await sleep(500);
       }

@@ -28,7 +28,7 @@ info:
     **Recovery cap.** Failed cancellations, refunds and seat releases are retried by the payment
     sweep up to `PAYMENT_RECOVERY_MAX_ATTEMPTS` times (default 20). After that the attempt ends in
     the internal state RECOVERY_FAILED, the sweep stops retrying it and an `ALERTA:` line is
-    logged for manual review. `GET /internal/purchases/{purchaseId}/payment-attempts` shows it.
+    logged for manual review. `GET /internal/reservations/{reservationId}/payment-attempts` shows it.
 
     **Card data.** The client tokenizes the card with the provider SDK (or sends a provider test
     payment method such as `pm_card_visa`). The API never receives or stores card numbers.
@@ -353,19 +353,19 @@ paths:
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
 
-  /internal/purchases/{purchaseId}/payment-attempts:
+  /internal/reservations/{reservationId}/payment-attempts:
     get:
       tags: [Internal]
       operationId: internalPaymentAttempts
-      summary: Payment attempts of a purchase (internal, operations)
+      summary: Payment attempts of a reservation's purchase (internal, operations)
       description: |
         **Internal** (service-to-service and operations). Lists every payment attempt of the
-        purchase with its internal status, including RECOVERY_FAILED when the recovery cap was
-        reached. Unknown purchases return an empty list.
+        purchase of the reservation with its internal status, including RECOVERY_FAILED when the
+        recovery cap was reached. A reservation without a purchase returns an empty list.
       security:
         - internalAuth: []
       parameters:
-        - name: purchaseId
+        - name: reservationId
           in: path
           required: true
           schema:

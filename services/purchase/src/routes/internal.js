@@ -17,13 +17,13 @@ router.get('/internal/stats/sales', requireInternal, async (_req, res) => {
 });
 
 router.get(
-  '/internal/purchases/:purchaseId/payment-attempts',
+  '/internal/reservations/:reservationId/payment-attempts',
   requireInternal,
   async (req, res) => {
     const rows = await query(
       `SELECT attempt, status, decline_code, last_error, recovery_attempts, updated_at
-       FROM payment_attempts WHERE purchase_id = ? ORDER BY attempt`,
-      [Number(req.params.purchaseId) || 0],
+       FROM payment_attempts WHERE reservation_id = ? ORDER BY attempt`,
+      [Number(req.params.reservationId) || 0],
     );
     res.json({
       items: rows.map((row) => ({
