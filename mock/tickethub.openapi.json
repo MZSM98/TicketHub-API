@@ -340,6 +340,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error (for example, the database is down).",
             "content": {
@@ -708,6 +754,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -972,6 +1064,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -1100,6 +1238,52 @@
                         "issue": "required"
                       }
                     ]
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -1396,6 +1580,52 @@
                       "code": "UNAUTHORIZED",
                       "message": "Sesión no válida o expirada, inicie sesión de nuevo"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -2304,6 +2534,52 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2645,6 +2921,52 @@
                 "example": {
                   "code": "EMAIL_ALREADY_REGISTERED",
                   "message": "El correo ya está registrado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -3295,6 +3617,52 @@
                 "example": {
                   "code": "EMAIL_ALREADY_REGISTERED",
                   "message": "El correo ya está registrado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -4059,6 +4427,52 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4738,6 +5152,52 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5411,6 +5871,52 @@
                       "code": "EVENT_HAS_NO_ZONES",
                       "message": "Configure al menos una zona antes de publicar"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -7042,6 +7548,52 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7525,6 +8077,52 @@
                 "example": {
                   "code": "VENUE_NOT_FOUND",
                   "message": "El recinto no existe"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -9866,6 +10464,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -10560,6 +11204,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -11003,6 +11693,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -11328,6 +12064,8 @@
                   "items": {
                     "type": "array",
                     "minItems": 1,
+                    "maxItems": 10,
+                    "description": "At most `MAX_TICKETS_PER_RESERVATION` (default 10) items.",
                     "items": {
                       "oneOf": [
                         {
@@ -11846,6 +12584,52 @@
                 "example": {
                   "code": "EVENT_NOT_AVAILABLE",
                   "message": "El evento ya no está disponible"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -13141,7 +13925,7 @@
             }
           },
           "402": {
-            "description": "The provider declined the charge (CU-08 FA1).",
+            "description": "The provider declined the charge or its capture (CU-08 FA1).",
             "content": {
               "application/json": {
                 "schema": {
@@ -13193,6 +13977,16 @@
                     "value": {
                       "code": "PAYMENT_ATTEMPTS_EXHAUSTED",
                       "message": "Pago declinado. Se agotaron los intentos y los asientos fueron liberados",
+                      "details": {
+                        "attemptsRemaining": 0
+                      }
+                    }
+                  },
+                  "captureDeclined": {
+                    "summary": "The provider rejected the capture; the authorization was cancelled and the seats were released",
+                    "value": {
+                      "code": "PAYMENT_ATTEMPTS_EXHAUSTED",
+                      "message": "Pago rechazado por la pasarela. No se hizo ningún cargo y los asientos fueron liberados",
                       "details": {
                         "attemptsRemaining": 0
                       }
@@ -13383,6 +14177,52 @@
                 "example": {
                   "code": "RESERVATION_EXPIRED",
                   "message": "Tiempo agotado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -15596,6 +16436,52 @@
                       "code": "TICKET_CANCELLED",
                       "message": "Acceso Denegado. El boleto fue cancelado"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
