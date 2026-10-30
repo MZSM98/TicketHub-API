@@ -1,6 +1,6 @@
 VM1_IP = "192.168.56.10"
 VM2_IP = "192.168.56.11"
-VM1_PORTS = "3002"
+VM1_PORTS = "3002,8080"
 VM2_PORTS = "3003,3004,3005,3306"
 
 Vagrant.configure("2") do |config|

@@ -2,10 +2,12 @@
 
 | VM | IP | Servicios | Puertos publicados |
 |----|----|-----------|--------------------|
-| vm1 | 192.168.56.10 | gateway, identity, catalog, MinIO, Mailpit | 8080 (gateway, reenviado a `127.0.0.1:8080` del host), 3002 (catalog, solo desde vm2), 8025 y 9001 solo en `127.0.0.1` de la VM |
+| vm1 | 192.168.56.10 | gateway, identity, catalog, MinIO, Mailpit | 8080 (gateway, reenviado a `127.0.0.1:8080` del host; en `192.168.56.10:8080` solo responde a vm2), 3002 (catalog, solo desde vm2), 8025 y 9001 solo en `127.0.0.1` de la VM |
 | vm2 | 192.168.56.11 | inventory, purchase, ticket, MySQL | 3003, 3004, 3005 y 3306, solo desde vm1 |
 
 El firewall (`deploy/firewall.sh`, servicio `tickethub-firewall`) se aplica en la cadena `DOCKER-USER` e `INPUT` y descarta conexiones nuevas a esos puertos que lleguen por la red privada desde cualquier IP distinta de la VM vecina, incluido el host.
+
+El gateway se publica en `0.0.0.0:8080` dentro de vm1 porque el `forwarded_port` de Vagrant entra por la NAT de VirtualBox a la IP `10.0.2.15` de la VM, no a su loopback; ligarlo a `127.0.0.1` rompería `localhost:8080` en el host. Por eso el acceso desde la red privada se corta en el firewall: desde el PC solo funciona `http://localhost:8080`.
 
 ## Requisitos
 
