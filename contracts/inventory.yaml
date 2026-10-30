@@ -396,6 +396,7 @@ paths:
                 userId: 101
                 eventId: 12
                 status: ACTIVE
+                purchaseId: null
                 createdAt: '2026-10-26T15:40:00Z'
                 expiresAt: '2026-10-26T15:50:00Z'
                 secondsRemaining: 600
@@ -997,10 +998,16 @@ components:
         seatNumber:
           type: integer
           minimum: 1
+          description: |
+            Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are
+            not modelled, so consecutive numbers in the same row are adjacent seats.
         status:
           $ref: '#/components/schemas/SeatStatus'
     SeatMap:
       type: object
+      description: |
+        Rows come in the order the organizer sent them when the seats were generated (not sorted by
+        `rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.
       required: [zoneId, eventId, name, price, currency, rows]
       properties:
         zoneId:
@@ -1015,6 +1022,7 @@ components:
           $ref: './common.yaml#/components/schemas/Currency'
         rows:
           type: array
+          description: In the order the organizer defined them, not sorted by `rowLabel`.
           items:
             type: object
             required: [rowLabel, seats]
@@ -1023,6 +1031,7 @@ components:
                 type: string
               seats:
                 type: array
+                description: Sorted by `seatNumber` ascending (1..seatCount).
                 items:
                   $ref: '#/components/schemas/Seat'
     SeatLayoutInput:
@@ -1102,21 +1111,12 @@ components:
         unitPrice:
           $ref: './common.yaml#/components/schemas/Money'
     InternalReservation:
-      description: Reservation as seen by PurchaseService. Only returned by the internal endpoint.
+      description: Reservation as seen by PurchaseService. Same shape as `Reservation`.
       allOf:
         - $ref: '#/components/schemas/Reservation'
-        - type: object
-          required: [purchaseId]
-          properties:
-            purchaseId:
-              type: integer
-              format: int64
-              minimum: 1
-              nullable: true
-              description: Purchase that confirmed the sale (set when `status=CONFIRMED`), otherwise null.
     Reservation:
       type: object
-      required: [id, userId, eventId, status, createdAt, expiresAt, secondsRemaining, total, currency, items]
+      required: [id, userId, eventId, status, purchaseId, createdAt, expiresAt, secondsRemaining, total, currency, items]
       properties:
         id:
           $ref: './common.yaml#/components/schemas/Id'
@@ -1126,6 +1126,14 @@ components:
           $ref: './common.yaml#/components/schemas/Id'
         status:
           $ref: '#/components/schemas/ReservationStatus'
+        purchaseId:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+          description: |
+            Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,
+            EXPIRED and CANCELLED (including a sale undone after a rejected capture).
         createdAt:
           type: string
           format: date-time

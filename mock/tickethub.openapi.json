@@ -9778,6 +9778,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Rows come in the order the organizer sent them when the seats were generated (not sorted by\n`rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.\n",
                   "required": [
                     "zoneId",
                     "eventId",
@@ -9817,6 +9818,7 @@
                     },
                     "rows": {
                       "type": "array",
+                      "description": "In the order the organizer defined them, not sorted by `rowLabel`.",
                       "items": {
                         "type": "object",
                         "required": [
@@ -9829,6 +9831,7 @@
                           },
                           "seats": {
                             "type": "array",
+                            "description": "Sorted by `seatNumber` ascending (1..seatCount).",
                             "items": {
                               "type": "object",
                               "required": [
@@ -9845,7 +9848,8 @@
                                 },
                                 "seatNumber": {
                                   "type": "integer",
-                                  "minimum": 1
+                                  "minimum": 1,
+                                  "description": "Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are\nnot modelled, so consecutive numbers in the same row are adjacent seats.\n"
                                 },
                                 "status": {
                                   "type": "string",
@@ -10134,6 +10138,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Rows come in the order the organizer sent them when the seats were generated (not sorted by\n`rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.\n",
                   "required": [
                     "zoneId",
                     "eventId",
@@ -10173,6 +10178,7 @@
                     },
                     "rows": {
                       "type": "array",
+                      "description": "In the order the organizer defined them, not sorted by `rowLabel`.",
                       "items": {
                         "type": "object",
                         "required": [
@@ -10185,6 +10191,7 @@
                           },
                           "seats": {
                             "type": "array",
+                            "description": "Sorted by `seatNumber` ascending (1..seatCount).",
                             "items": {
                               "type": "object",
                               "required": [
@@ -10201,7 +10208,8 @@
                                 },
                                 "seatNumber": {
                                   "type": "integer",
-                                  "minimum": 1
+                                  "minimum": 1,
+                                  "description": "Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are\nnot modelled, so consecutive numbers in the same row are adjacent seats.\n"
                                 },
                                 "status": {
                                   "type": "string",
@@ -12151,6 +12159,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -12185,6 +12194,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -12267,6 +12283,7 @@
                   "userId": 101,
                   "eventId": 12,
                   "status": "ACTIVE",
+                  "purchaseId": null,
                   "createdAt": "2026-10-26T15:40:00Z",
                   "expiresAt": "2026-10-26T15:50:00Z",
                   "secondsRemaining": 600,
@@ -12836,6 +12853,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -12870,6 +12888,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -13120,6 +13145,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -13154,6 +13180,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -13404,6 +13437,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -13438,6 +13472,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",

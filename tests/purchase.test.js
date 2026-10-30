@@ -228,6 +228,17 @@ describe('PurchaseService (purchase.yaml)', () => {
     });
     const confirmed = await internalReservation(reservation.id);
     assert.equal(confirmed.status, 'CONFIRMED');
+    const paidReservation = await expectContract(
+      'GET',
+      `/reservations/${reservation.id}`,
+      200,
+      { token },
+      '/reservations/{reservationId}',
+    );
+    assert.deepEqual(
+      [paidReservation.status, paidReservation.purchaseId],
+      ['CONFIRMED', purchase.id],
+    );
     const again = await pay(token, reservation.id, 'pm_card_visa', 409);
     assert.deepEqual(
       [again.code, again.details],

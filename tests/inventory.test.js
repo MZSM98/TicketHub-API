@@ -737,6 +737,14 @@ describe('InventoryService (inventory.yaml)', () => {
       const path = `/internal/reservations/${s.resB.id}`;
       const got = await expectInternal('GET', path, 200, INTERNAL_RESERVATION_SCHEMA);
       assert.deepEqual([got.status, got.purchaseId], ['ACTIVE', null]);
+      const activeView = await expectContract(
+        'GET',
+        `/reservations/${s.resB.id}`,
+        200,
+        { token: s.buyers[1] },
+        '/reservations/{reservationId}',
+      );
+      assert.deepEqual([activeView.status, activeView.purchaseId], ['ACTIVE', null]);
       const invalid = await expectInternal('POST', `${path}/confirm-sale`, 400, ERROR_SCHEMA, {
         body: { purchaseId: 'x' },
       });
@@ -765,7 +773,7 @@ describe('InventoryService (inventory.yaml)', () => {
         { token: s.buyers[1] },
         '/reservations/{reservationId}',
       );
-      assert.equal('purchaseId' in publicView, false, 'el cliente no ve purchaseId');
+      assert.deepEqual([publicView.status, publicView.purchaseId], ['CONFIRMED', purchaseId]);
       const other = await expectInternal('POST', `${path}/confirm-sale`, 409, ERROR_SCHEMA, {
         body: { purchaseId: purchaseId + 1 },
       });
