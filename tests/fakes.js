@@ -16,6 +16,8 @@ export const fakes = {
     mode: 'normal',
     delayMs: 0,
     failCancels: false,
+    failCancelsFor: new Set(),
+    missingFor: new Set(),
     idempotencyErrorFor: new Set(),
     idempotencyErrorAfterAuthorize: new Set(),
     captureFailures: new Map(),
@@ -200,6 +202,21 @@ async function handleStripe(req, res, url) {
   }
   if (stripe.failCancels && /\/(cancel|refunds)$/.test(url.pathname)) {
     return send(res, 503, { error: { type: 'api_error' } });
+  }
+  const acted = /^\/v1\/payment_intents\/([^/]+)\/(cancel|capture)$/.exec(url.pathname);
+  const actedOn = acted ? stripe.intents.get(acted[1])?.reservationId : undefined;
+  if (acted && acted[2] === 'cancel' && stripe.failCancelsFor.has(actedOn)) {
+    return send(res, 503, { error: { type: 'api_error' } });
+  }
+  if (acted && stripe.missingFor.has(actedOn)) {
+    return send(res, 404, {
+      error: {
+        type: 'invalid_request_error',
+        code: 'resource_missing',
+        param: 'intent',
+        message: `No such payment_intent: '${acted[1]}'`,
+      },
+    });
   }
   if (stripe.mode === 'garbage') {
     res.writeHead(200, { 'content-type': 'text/html' });

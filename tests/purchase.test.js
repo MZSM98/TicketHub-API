@@ -112,13 +112,13 @@ describe('PurchaseService (purchase.yaml)', () => {
         { token: s.org.token, body },
         '/events/{eventId}/zones',
       );
-    s.platea = await zone({ name: 'Platea', type: 'NUMBERED', price: '500.00', capacity: 12 });
+    s.platea = await zone({ name: 'Platea', type: 'NUMBERED', price: '500.00', capacity: 14 });
     s.general = await zone({ name: 'General', type: 'GENERAL', price: '250.00', capacity: 100 });
     const map = await expectContract(
       'POST',
       `/zones/${s.platea.id}/seats`,
       201,
-      { token: s.org.token, body: { rows: [{ rowLabel: 'A', seatCount: 12 }] } },
+      { token: s.org.token, body: { rows: [{ rowLabel: 'A', seatCount: 14 }] } },
       '/zones/{zoneId}/seats',
     );
     s.seats = Object.fromEntries(map.rows[0].seats.map((seat) => [seat.seatNumber, seat.id]));
@@ -574,14 +574,14 @@ describe('PurchaseService (purchase.yaml)', () => {
       {
         purchases: s.paid.length,
         grossRevenue: gross,
-        capacity: 112,
+        capacity: 114,
         ticketsSold: 11,
         platea: [4, '2000.00'],
         general: [7, '1750.00'],
         byDay: [{ date: today, purchases: s.paid.length, revenue: `${gross / 100}.00` }],
       },
     );
-    assert.equal(sales.occupancyRate, Number((11 / 112).toFixed(4)));
+    assert.equal(sales.occupancyRate, Number((11 / 114).toFixed(4)));
     assert.equal(
       sales.byZone.reduce((sum, z) => sum + cents(z.revenue), 0),
       cents(sales.grossRevenue),
@@ -945,6 +945,98 @@ describe('PurchaseService (purchase.yaml)', () => {
     } finally {
       fakes.tickets.up = true;
       for (const id of stuck) fakes.tickets.failFor.delete(id);
+    }
+  });
+
+  const attemptsOf = async (purchaseId) => {
+    const { res, body } = await call('GET', `/internal/purchases/${purchaseId}/payment-attempts`, {
+      base: PURCHASE,
+      headers: internal,
+    });
+    assert.equal(res.status, 200, JSON.stringify(body));
+    return body.items;
+  };
+
+  test('captura 404 y cancelación 404: CANCELED, asiento AVAILABLE, ventas sin cambio y otro comprador lo reserva', async () => {
+    const token = s.buyers[15];
+    const before = await salesOf();
+    const reservation = await reserve(token, [seat(13)]);
+    fakes.stripe.missingFor.add(reservation.id);
+    let declined;
+    try {
+      declined = await pay(token, reservation.id, 'pm_card_visa', 402);
+    } finally {
+      fakes.stripe.missingFor.delete(reservation.id);
+    }
+    assert.deepEqual(
+      [declined.code, declined.message, declined.details],
+      [
+        'PAYMENT_ATTEMPTS_EXHAUSTED',
+        'Pago rechazado por la pasarela. No se hizo ningún cargo y los asientos fueron liberados',
+        { attemptsRemaining: 0 },
+      ],
+    );
+    const [charge] = chargesOf(reservation.id);
+    assert.equal(requestsTo('cancel', charge), 1, 'una sola cancelación, sin reintentos');
+    assert.equal(await seatStatus(s.seats[13]), 'AVAILABLE');
+    const released = await internalReservation(reservation.id);
+    assert.deepEqual([released.status, released.purchaseId], ['CANCELLED', null]);
+    const after = await salesOf();
+    assert.deepEqual(
+      [after.ticketsSold, after.purchases, after.grossRevenue],
+      [before.ticketsSold, before.purchases, before.grossRevenue],
+    );
+    const purchase = (await expectContract('GET', '/purchases/me', 200, { token })).items[0];
+    const [attempt] = await attemptsOf(purchase.id);
+    assert.deepEqual([attempt.status, attempt.recoveryAttempts], ['CANCELED', 0]);
+    await sleep(6000);
+    assert.equal(requestsTo('cancel', charge), 1, 'el barrido no vuelve a cancelar');
+    const other = await reserve(s.buyers[16], [seat(13)]);
+    assert.equal(other.status, 'ACTIVE');
+    await expectContract(
+      'POST',
+      `/reservations/${other.id}/cancel`,
+      200,
+      { token: s.buyers[16] },
+      '/reservations/{reservationId}/cancel',
+    );
+    console.log(
+      `[captura 404 + cancelación 404] intento ${attempt.status}, asiento AVAILABLE, ticketsSold ${before.ticketsSold}->${after.ticketsSold}`,
+    );
+  });
+
+  test('cancelación caída para siempre: tope de recuperación deja RECOVERY_FAILED, deja de reintentar y el 402 no dice que liberó', async () => {
+    const token = s.buyers[17];
+    const reservation = await reserve(token, [seat(14)]);
+    fakes.stripe.captureFailures.set(reservation.id, { mode: '400', times: Infinity });
+    fakes.stripe.failCancelsFor.add(reservation.id);
+    try {
+      const declined = await pay(token, reservation.id, 'pm_card_visa', 402);
+      assert.equal(declined.code, 'PAYMENT_ATTEMPTS_EXHAUSTED');
+      assert.match(declined.message, /siguen pendientes/);
+      assert.doesNotMatch(declined.message, /fueron liberados/);
+      const [charge] = chargesOf(reservation.id);
+      const { purchaseId } = await internalReservation(reservation.id);
+      let attempt;
+      const started = Date.now();
+      while (Date.now() - started < 40000) {
+        [attempt] = await attemptsOf(purchaseId);
+        if (attempt.status === 'RECOVERY_FAILED') break;
+        await sleep(500);
+      }
+      assert.deepEqual([attempt.status, attempt.recoveryAttempts], ['RECOVERY_FAILED', 3]);
+      assert.match(attempt.lastError, /Stripe respondió 503/);
+      const cancels = requestsTo('cancel', charge);
+      assert.equal(cancels, 3);
+      await sleep(7000);
+      assert.equal(requestsTo('cancel', charge), cancels, 'el barrido ya no reintenta');
+      assert.equal(await seatStatus(s.seats[14]), 'SOLD', 'sin liberar hasta revisión manual');
+      console.log(
+        `[tope de recuperación] ${attempt.status} tras ${attempt.recoveryAttempts} cancelaciones fallidas en ${Date.now() - started} ms`,
+      );
+    } finally {
+      fakes.stripe.failCancelsFor.delete(reservation.id);
+      fakes.stripe.captureFailures.delete(reservation.id);
     }
   });
 
