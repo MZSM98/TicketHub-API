@@ -31,6 +31,7 @@ export const config = {
   ticketRetryMaxAttempts: atLeastOne('TICKET_RETRY_MAX_ATTEMPTS', 50),
   paymentSweepMs: positiveNumber('PAYMENT_SWEEP_SECONDS', 60) * 1000,
   reconcileAfterSeconds: positiveNumber('PAYMENT_RECONCILE_AFTER_SECONDS', 60),
+  recoveryMaxAttempts: atLeastOne('PAYMENT_RECOVERY_MAX_ATTEMPTS', 20),
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY ?? '',
     apiBase: process.env.STRIPE_API_BASE ?? 'https://api.stripe.com',
