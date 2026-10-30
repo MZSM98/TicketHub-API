@@ -719,7 +719,7 @@ paths:
                 $ref: './common.yaml#/components/schemas/Error'
               example:
                 code: INVALID_RESERVATION_STATE
-                message: La reserva no se puede confirmar
+                message: La venta de la reserva no se puede revocar
                 details:
                   status: CONFIRMED
         '413':
