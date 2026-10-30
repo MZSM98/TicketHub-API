@@ -968,10 +968,16 @@ components:
         seatNumber:
           type: integer
           minimum: 1
+          description: |
+            Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are
+            not modelled, so consecutive numbers in the same row are adjacent seats.
         status:
           $ref: '#/components/schemas/SeatStatus'
     SeatMap:
       type: object
+      description: |
+        Rows come in the order the organizer sent them when the seats were generated (not sorted by
+        `rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.
       required: [zoneId, eventId, name, price, currency, rows]
       properties:
         zoneId:
@@ -986,6 +992,7 @@ components:
           $ref: './common.yaml#/components/schemas/Currency'
         rows:
           type: array
+          description: In the order the organizer defined them, not sorted by `rowLabel`.
           items:
             type: object
             required: [rowLabel, seats]
@@ -994,6 +1001,7 @@ components:
                 type: string
               seats:
                 type: array
+                description: Sorted by `seatNumber` ascending (1..seatCount).
                 items:
                   $ref: '#/components/schemas/Seat'
     SeatLayoutInput:
