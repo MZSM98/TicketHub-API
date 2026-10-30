@@ -1,3 +1,4 @@
+import { publicBaseUrl } from '@tickethub/common/public-url';
 import { config } from './config.js';
 import { query } from '@tickethub/common/db';
 import { HttpError, parseId } from '@tickethub/common/http';
@@ -36,7 +37,14 @@ export const EVENT_SELECT = `SELECT e.id, e.organizer_id, e.title, e.description
   v.id AS venue_id, v.name AS venue_name, v.address AS venue_address, v.city AS venue_city
   FROM events e JOIN venues v ON v.id = e.venue_id`;
 
-export function toEvent(row) {
+export const publicBase = (req) =>
+  publicBaseUrl(req.headers, {
+    fallback: config.publicBaseUrl,
+    gatewaySecret: config.gatewaySecret,
+    allowedHosts: config.allowedHosts,
+  });
+
+export function toEvent(row, baseUrl = config.publicBaseUrl) {
   return {
     id: row.id,
     organizerId: row.organizer_id,
@@ -45,7 +53,7 @@ export function toEvent(row) {
     category: row.category,
     startsAt: iso(row.starts_at),
     status: row.status,
-    posterUrl: row.poster_key ? `${config.publicBaseUrl}/events/${row.id}/poster` : null,
+    posterUrl: row.poster_key ? `${baseUrl}/events/${row.id}/poster` : null,
     venue: {
       id: row.venue_id,
       name: row.venue_name,

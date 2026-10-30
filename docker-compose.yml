@@ -138,6 +138,8 @@ services:
       DB_USER: ${CATALOG_DB_USER}
       DB_PASSWORD: ${CATALOG_DB_PASSWORD}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      GATEWAY_FORWARD_SECRET: ${GATEWAY_FORWARD_SECRET}
+      PUBLIC_HOSTS_ALLOWED: ${PUBLIC_HOSTS_ALLOWED:-}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
@@ -203,6 +205,7 @@ services:
       NODE_ENV: ${NODE_ENV}
       PORT: 8080
       JWT_SECRET: ${JWT_SECRET}
+      GATEWAY_FORWARD_SECRET: ${GATEWAY_FORWARD_SECRET}
     ports:
       - '${GATEWAY_HOST_PORT}:8080'
     # Sin depends_on de salud: si un servicio cae, el gateway sigue y responde 503 solo en sus rutas.
@@ -243,6 +246,7 @@ services:
       CATALOG_URL: http://catalog-service:3002/api/v1
       FAKES_PORT: 4100
       MAILPIT_URL: http://mailpit:8025
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
