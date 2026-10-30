@@ -2,6 +2,7 @@ import http from 'node:http';
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
+import { forwardBody, limitBody } from './body-limit.js';
 import { authMode, resolveService } from './routes.js';
 import { checkJwtSecret } from './secret.js';
 
@@ -59,6 +60,7 @@ const proxies = Object.fromEntries(
       agent: proxyAgent,
       proxyTimeout: PROXY_TIMEOUT_MS,
       on: {
+        proxyReq: forwardBody,
         // Si un servicio está caído solo fallan sus rutas (RNF-03).
         error: (_err, _req, res) => {
           if (typeof res.writeHead !== 'function') return res.destroy();
@@ -99,7 +101,7 @@ app.use(API_PREFIX, (req, res, next) => {
   }
   // Express quita el prefijo de req.url al montar; se restaura para reenviar la ruta completa.
   req.url = req.originalUrl;
-  return proxies[service](req, res, next);
+  return limitBody(req, res, () => proxies[service](req, res, next));
 });
 
 app.use((_req, res) => sendError(res, 404, 'NOT_FOUND', 'Recurso no encontrado'));
