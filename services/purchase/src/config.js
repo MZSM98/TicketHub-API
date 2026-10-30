@@ -42,6 +42,12 @@ export const config = {
   },
 };
 
+function greaterThanZero(name) {
+  const value = Number(process.env[name]);
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} debe ser mayor que 0`);
+  return value;
+}
+
 config.claimSeconds = process.env.PAYMENT_CLAIM_SECONDS
-  ? positiveNumber('PAYMENT_CLAIM_SECONDS', 0)
+  ? greaterThanZero('PAYMENT_CLAIM_SECONDS')
   : Math.ceil((5 * config.stripe.timeoutMs + 2 * config.internalTimeoutMs) / 1000) + 10;
