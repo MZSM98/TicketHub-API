@@ -230,13 +230,30 @@ const itemNotValid = (index, field) =>
     },
   );
 
+const ACTIVE_CONFLICT_ROUNDS = 3;
+
+async function insertOrReportActive(userId, insert) {
+  for (let round = 1; round <= ACTIVE_CONFLICT_ROUNDS; round++) {
+    try {
+      return await insert();
+    } catch (err) {
+      if (err?.errno !== 1062) throw err;
+      const activeId = await activeReservationIdOf(userId);
+      if (activeId !== null) throw activeReservationExists(activeId);
+    }
+  }
+  console.error(
+    `La reserva activa del usuario ${userId} desapareció ${ACTIVE_CONFLICT_ROUNDS} veces seguidas tras el conflicto de unicidad`,
+  );
+  throw reservationFailed();
+}
+
 export async function createReservation(userId, eventId, items) {
   const seatItems = items.filter((item) => item.seatId !== undefined);
   const generalItems = items.filter((item) => item.zoneId !== undefined);
   const seatIds = seatItems.map((item) => item.seatId);
-  let reservationId;
-  try {
-    reservationId = await withRetry(() =>
+  const reservationId = await insertOrReportActive(userId, () =>
+    withRetry(() =>
       transaction(async (conn) => {
         const placesByZone = new Map();
         const priceByZone = new Map();
@@ -337,13 +354,8 @@ export async function createReservation(userId, eventId, items) {
         }
         return id;
       }),
-    );
-  } catch (err) {
-    if (err?.errno === 1062) {
-      throw activeReservationExists(await activeReservationIdOf(userId));
-    }
-    throw err;
-  }
+    ),
+  );
   const [row] = await query(`SELECT ${RESERVATION_COLUMNS} FROM reservations WHERE id = ?`, [
     reservationId,
   ]);
