@@ -8,18 +8,26 @@ const isMultipart = (req) => /^multipart\/form-data/i.test(req.headers['content-
 
 const DRAIN_LIMIT_BYTES = 16 * 1024 * 1024;
 const DRAIN_TIMEOUT_MS = 2000;
+const CLOSE_GRACE_MS = 5000;
 
 function cutAfterResponse(req, res) {
   let drained = 0;
+  let closing = false;
   const cut = () => {
-    if (!req.complete) req.destroy();
+    if (req.complete || closing) return;
+    closing = true;
+    req.socket.end();
+    setTimeout(() => req.socket.destroy(), CLOSE_GRACE_MS).unref();
   };
   req.on('data', (chunk) => {
     drained += chunk.length;
-    if (drained > DRAIN_LIMIT_BYTES) cut();
+    if (drained > DRAIN_LIMIT_BYTES && res.writableFinished) cut();
   });
   req.resume();
-  res.once('finish', () => setTimeout(cut, DRAIN_TIMEOUT_MS).unref());
+  res.once('finish', () => {
+    if (drained > DRAIN_LIMIT_BYTES) return cut();
+    setTimeout(cut, DRAIN_TIMEOUT_MS).unref();
+  });
 }
 
 function tooLarge(req, res) {
