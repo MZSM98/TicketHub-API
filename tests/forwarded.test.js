@@ -71,9 +71,28 @@ describe('TRUST_PROXY y cabeceras reenviadas del gateway', () => {
   });
 
   test('TRUST_PROXY inválido impide arrancar', () => {
-    for (const bad of ['10.0.0.0/33', 'abc', '10.0.0.1/8/1', '::/129', '10.0.0.0/x']) {
+    const invalid = [
+      '10.0.0.0/33',
+      'abc',
+      '10.0.0.1/8/1',
+      '::/129',
+      '10.0.0.0/x',
+      '10.0.0.0/08',
+      '010.0.0.1',
+      '10.0.0.1:8080',
+      '::/0',
+      '::/64',
+      '::ffff:0:0/96',
+      '::ffff:10.0.0.0/104',
+      '::ffff:10.0.0.1',
+    ];
+    for (const bad of invalid) {
       assert.throws(() => parseTrustedProxies(bad), /TRUST_PROXY tiene una entrada inválida/, bad);
     }
     assert.equal(parseTrustedProxies('')('127.0.0.1'), false);
+    const trusted = parseTrustedProxies('172.30.0.10, fd00::/8');
+    assert.equal(trusted('::ffff:172.30.0.10'), true, 'el par IPv4 llega mapeado en IPv6');
+    assert.equal(trusted('fd00::5'), true);
+    assert.equal(trusted('172.30.0.11'), false);
   });
 });
