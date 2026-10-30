@@ -23,7 +23,7 @@ El gateway se publica en `0.0.0.0:8080` dentro de vm1 porque el `forwarded_port`
 
 ## Administrador
 
-`vagrant up` crea el ADMIN con `ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`. `gen-env.sh` genera esa contraseña al azar; consúltala en el `.env` (no se imprime en ningún log). No es la del tutorial ni la de la colección de Postman, que usan la contraseña de ejemplo; para usarlas cambia el valor en Postman o inicia sesión con la del `.env`. Si el admin ya existe, el aprovisionamiento lo indica y sigue; cualquier otro fallo detiene el aprovisionamiento.
+`vagrant up` crea el ADMIN con `ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`. `gen-env.sh` genera esa contraseña al azar; consúltala en el `.env` (no se imprime en ningún log). No es `change-me-admin-password` de `.env.example`, que es la que suponen el tutorial del README principal y una colección de Postman configurada con ese ejemplo (el repositorio no incluye colección); en Postman pon el valor del `.env`. Si el admin ya existe, el aprovisionamiento lo indica y sigue; cualquier otro fallo detiene el aprovisionamiento.
 
 ## Uso
 
