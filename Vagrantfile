@@ -12,7 +12,7 @@ Vagrant.configure("2") do |config|
     vm.vm.network "private_network", ip: VM2_IP
     vm.vm.provider "virtualbox" do |vb|
       vb.name = "tickethub-vm2"
-      vb.memory = Integer(ENV.fetch("VM2_MEMORY", "3072"))
+      vb.memory = Integer(ENV.fetch("VM2_MEMORY", "2560"))
       vb.cpus = 2
     end
     vm.vm.provision "shell", path: "deploy/provision.sh", args: ["vm2", VM2_IP, VM1_IP, VM2_PORTS]
