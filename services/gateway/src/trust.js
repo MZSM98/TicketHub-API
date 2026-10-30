@@ -5,6 +5,16 @@ function familyOf(address) {
   return family === 4 ? 'ipv4' : family === 6 ? 'ipv6' : null;
 }
 
+const MAPPED_IPV4 = new BlockList();
+MAPPED_IPV4.addSubnet('::ffff:0:0', 96, 'ipv6');
+
+function overlapsMappedIpv4(address, prefix) {
+  if (MAPPED_IPV4.check(address, 'ipv6')) return true;
+  const range = new BlockList();
+  range.addSubnet(address, prefix, 'ipv6');
+  return range.check('::ffff:0:0', 'ipv6');
+}
+
 export function parseTrustedProxies(value) {
   const list = new BlockList();
   let count = 0;
@@ -13,8 +23,14 @@ export function parseTrustedProxies(value) {
     const [address, prefix, extra] = entry.split('/');
     const type = familyOf(address);
     const max = type === 'ipv4' ? 32 : 128;
-    const bits = prefix === undefined ? max : /^\d{1,3}$/.test(prefix) ? Number(prefix) : NaN;
-    if (!type || extra !== undefined || !(bits >= 0 && bits <= max)) {
+    const bits =
+      prefix === undefined ? max : /^(0|[1-9]\d{0,2})$/.test(prefix) ? Number(prefix) : NaN;
+    if (
+      !type ||
+      extra !== undefined ||
+      !(bits >= 0 && bits <= max) ||
+      (type === 'ipv6' && overlapsMappedIpv4(address, bits))
+    ) {
       throw new Error(`TRUST_PROXY tiene una entrada inválida: ${entry}`);
     }
     list.addSubnet(address, bits, type);
