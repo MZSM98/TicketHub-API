@@ -1073,21 +1073,12 @@ components:
         unitPrice:
           $ref: './common.yaml#/components/schemas/Money'
     InternalReservation:
-      description: Reservation as seen by PurchaseService. Only returned by the internal endpoint.
+      description: Reservation as seen by PurchaseService. Same shape as `Reservation`.
       allOf:
         - $ref: '#/components/schemas/Reservation'
-        - type: object
-          required: [purchaseId]
-          properties:
-            purchaseId:
-              type: integer
-              format: int64
-              minimum: 1
-              nullable: true
-              description: Purchase that confirmed the sale (set when `status=CONFIRMED`), otherwise null.
     Reservation:
       type: object
-      required: [id, userId, eventId, status, createdAt, expiresAt, secondsRemaining, total, currency, items]
+      required: [id, userId, eventId, status, purchaseId, createdAt, expiresAt, secondsRemaining, total, currency, items]
       properties:
         id:
           $ref: './common.yaml#/components/schemas/Id'
@@ -1097,6 +1088,14 @@ components:
           $ref: './common.yaml#/components/schemas/Id'
         status:
           $ref: '#/components/schemas/ReservationStatus'
+        purchaseId:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+          description: |
+            Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,
+            EXPIRED and CANCELLED (including a sale undone after a rejected capture).
         createdAt:
           type: string
           format: date-time

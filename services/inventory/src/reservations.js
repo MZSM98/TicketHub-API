@@ -57,6 +57,7 @@ export async function toReservation(row, conn) {
     userId: row.user_id,
     eventId: row.event_id,
     status,
+    purchaseId: row.purchase_id ?? null,
     createdAt: iso(row.created_at),
     expiresAt: iso(row.expires_at),
     secondsRemaining: remaining,
