@@ -3873,7 +3873,7 @@
                                 "type": "string",
                                 "format": "uri",
                                 "nullable": true,
-                                "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                                "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                               },
                               "venue": {
                                 "allOf": [
@@ -4190,7 +4190,7 @@
                       "type": "string",
                       "format": "uri",
                       "nullable": true,
-                      "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                      "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                     },
                     "venue": {
                       "allOf": [
@@ -4575,7 +4575,7 @@
                       "type": "string",
                       "format": "uri",
                       "nullable": true,
-                      "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                      "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                     },
                     "venue": {
                       "allOf": [
@@ -4846,7 +4846,7 @@
                       "type": "string",
                       "format": "uri",
                       "nullable": true,
-                      "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                      "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                     },
                     "venue": {
                       "allOf": [
@@ -5568,7 +5568,7 @@
                       "type": "string",
                       "format": "uri",
                       "nullable": true,
-                      "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                      "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                     },
                     "venue": {
                       "allOf": [
@@ -6246,7 +6246,7 @@
                       "type": "string",
                       "format": "uri",
                       "nullable": true,
-                      "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                      "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                     },
                     "venue": {
                       "allOf": [
@@ -6826,7 +6826,7 @@
                                 "type": "string",
                                 "format": "uri",
                                 "nullable": true,
-                                "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                                "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                               },
                               "venue": {
                                 "allOf": [
@@ -9035,7 +9035,7 @@
                         "type": "string",
                         "format": "uri",
                         "nullable": true,
-                        "description": "Gateway URL of the poster (built from `poster_key`); null if there is no poster."
+                        "description": "Absolute URL of the poster (built from `poster_key`); null if there is no poster. The base is\nbuilt from the host and scheme the client used to call the gateway (`X-Forwarded-Host` and\n`X-Forwarded-Proto` set by the gateway, filtered by `PUBLIC_HOSTS_ALLOWED`); if they are\nmissing or invalid, or the service is called without the gateway, `PUBLIC_BASE_URL` is used.\n"
                       },
                       "venue": {
                         "allOf": [
@@ -12492,36 +12492,124 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
-                      "example": "VALIDATION_ERROR"
-                    },
-                    "message": {
-                      "type": "string",
-                      "description": "Human-readable message in Spanish, ready to show in the UI.",
-                      "example": "Por favor llene todos los campos requeridos"
-                    },
-                    "details": {
-                      "type": "object",
-                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
-                      "additionalProperties": true,
-                      "example": {
-                        "fields": [
-                          {
-                            "field": "title",
-                            "issue": "required"
+                  "oneOf": [
+                    {
+                      "description": "409 `ACTIVE_RESERVATION_EXISTS`. `details.reservationId` is the buyer's ACTIVE reservation.",
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "code",
+                            "message"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                              "example": "VALIDATION_ERROR"
+                            },
+                            "message": {
+                              "type": "string",
+                              "description": "Human-readable message in Spanish, ready to show in the UI.",
+                              "example": "Por favor llene todos los campos requeridos"
+                            },
+                            "details": {
+                              "type": "object",
+                              "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                              "additionalProperties": true,
+                              "example": {
+                                "fields": [
+                                  {
+                                    "field": "title",
+                                    "issue": "required"
+                                  }
+                                ]
+                              }
+                            }
                           }
-                        ]
-                      }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "code",
+                            "details"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "ACTIVE_RESERVATION_EXISTS"
+                              ]
+                            },
+                            "details": {
+                              "type": "object",
+                              "required": [
+                                "reservationId"
+                              ],
+                              "additionalProperties": false,
+                              "properties": {
+                                "reservationId": {
+                                  "type": "integer",
+                                  "format": "int64",
+                                  "minimum": 1,
+                                  "example": 42
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "description": "409 `SEAT_UNAVAILABLE` or `ZONE_CAPACITY_EXCEEDED` when creating a reservation.",
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "code",
+                            "message"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                              "example": "VALIDATION_ERROR"
+                            },
+                            "message": {
+                              "type": "string",
+                              "description": "Human-readable message in Spanish, ready to show in the UI.",
+                              "example": "Por favor llene todos los campos requeridos"
+                            },
+                            "details": {
+                              "type": "object",
+                              "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                              "additionalProperties": true,
+                              "example": {
+                                "fields": [
+                                  {
+                                    "field": "title",
+                                    "issue": "required"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "SEAT_UNAVAILABLE",
+                                "ZONE_CAPACITY_EXCEEDED"
+                              ]
+                            }
+                          }
+                        }
+                      ]
                     }
-                  }
+                  ]
                 },
                 "examples": {
                   "seatUnavailable": {
@@ -14127,36 +14215,123 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "code",
-                    "message"
-                  ],
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
-                      "example": "VALIDATION_ERROR"
-                    },
-                    "message": {
-                      "type": "string",
-                      "description": "Human-readable message in Spanish, ready to show in the UI.",
-                      "example": "Por favor llene todos los campos requeridos"
-                    },
-                    "details": {
-                      "type": "object",
-                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
-                      "additionalProperties": true,
-                      "example": {
-                        "fields": [
-                          {
-                            "field": "title",
-                            "issue": "required"
+                  "oneOf": [
+                    {
+                      "description": "409 `RESERVATION_ALREADY_PAID`. `details.purchaseId` is the purchase that paid the reservation.",
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "code",
+                            "message"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                              "example": "VALIDATION_ERROR"
+                            },
+                            "message": {
+                              "type": "string",
+                              "description": "Human-readable message in Spanish, ready to show in the UI.",
+                              "example": "Por favor llene todos los campos requeridos"
+                            },
+                            "details": {
+                              "type": "object",
+                              "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                              "additionalProperties": true,
+                              "example": {
+                                "fields": [
+                                  {
+                                    "field": "title",
+                                    "issue": "required"
+                                  }
+                                ]
+                              }
+                            }
                           }
-                        ]
-                      }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "code",
+                            "details"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "RESERVATION_ALREADY_PAID"
+                              ]
+                            },
+                            "details": {
+                              "type": "object",
+                              "required": [
+                                "purchaseId"
+                              ],
+                              "additionalProperties": false,
+                              "properties": {
+                                "purchaseId": {
+                                  "type": "integer",
+                                  "format": "int64",
+                                  "minimum": 1,
+                                  "example": 42
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "description": "409 `RESERVATION_NOT_ACTIVE`.",
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "code",
+                            "message"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                              "example": "VALIDATION_ERROR"
+                            },
+                            "message": {
+                              "type": "string",
+                              "description": "Human-readable message in Spanish, ready to show in the UI.",
+                              "example": "Por favor llene todos los campos requeridos"
+                            },
+                            "details": {
+                              "type": "object",
+                              "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                              "additionalProperties": true,
+                              "example": {
+                                "fields": [
+                                  {
+                                    "field": "title",
+                                    "issue": "required"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "RESERVATION_NOT_ACTIVE"
+                              ]
+                            }
+                          }
+                        }
+                      ]
                     }
-                  }
+                  ]
                 },
                 "examples": {
                   "alreadyPaid": {

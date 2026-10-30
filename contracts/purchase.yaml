@@ -156,7 +156,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './common.yaml#/components/schemas/Error'
+                oneOf:
+                  - $ref: '#/components/schemas/ReservationAlreadyPaidError'
+                  - $ref: '#/components/schemas/ReservationNotActiveError'
               examples:
                 alreadyPaid:
                   value:
@@ -395,6 +397,32 @@ components:
     internalAuth:
       $ref: './common.yaml#/components/securitySchemes/internalAuth'
   schemas:
+    ReservationAlreadyPaidError:
+      description: 409 `RESERVATION_ALREADY_PAID`. `details.purchaseId` is the purchase that paid the reservation.
+      allOf:
+        - $ref: './common.yaml#/components/schemas/Error'
+        - type: object
+          required: [code, details]
+          properties:
+            code:
+              type: string
+              enum: [RESERVATION_ALREADY_PAID]
+            details:
+              type: object
+              required: [purchaseId]
+              additionalProperties: false
+              properties:
+                purchaseId:
+                  $ref: './common.yaml#/components/schemas/Id'
+    ReservationNotActiveError:
+      description: 409 `RESERVATION_NOT_ACTIVE`.
+      allOf:
+        - $ref: './common.yaml#/components/schemas/Error'
+        - type: object
+          properties:
+            code:
+              type: string
+              enum: [RESERVATION_NOT_ACTIVE]
     PurchaseStatus:
       type: string
       enum: [PAID, DECLINED]

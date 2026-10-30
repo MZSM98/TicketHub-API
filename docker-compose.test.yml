@@ -79,8 +79,15 @@ services:
     environment:
       CATALOG_SERVICE_URL: http://catalog-down.invalid:3002
 
+  gateway-trusted:
+    extends: { file: docker-compose.yml, service: gateway }
+    ports: !reset []
+    environment:
+      TRUST_PROXY: 0.0.0.0/0,::/0
+
   tests:
     environment:
+      GATEWAY_TRUSTED_URL: http://gateway-trusted:8080/api/v1
       INVENTORY_URL: http://inventory-service:3003/api/v1
       INVENTORY_SWEEP_URL: http://inventory-sweep:3003/api/v1
       INVENTORY_LAZY_URL: http://inventory-lazy:3003/api/v1
@@ -98,3 +105,4 @@ services:
       purchase-isolated: { condition: service_healthy }
       purchase-shortclaim: { condition: service_healthy }
       gateway-slow: { condition: service_started }
+      gateway-trusted: { condition: service_healthy }
