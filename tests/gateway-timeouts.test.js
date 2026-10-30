@@ -47,7 +47,9 @@ describe('timeouts del gateway contra cuerpos y headers lentos', () => {
     const result = await slowRequest(head, { trickle: true });
     const body = assertTimeoutJson(result);
     assert.ok(result.elapsed >= 2500 && result.elapsed < 6000, `cortó en ${result.elapsed} ms`);
-    console.log(`[cuerpo lento] 408 ${JSON.stringify(body)} a los ${result.elapsed} ms (límite 3 s)`);
+    console.log(
+      `[cuerpo lento] 408 ${JSON.stringify(body)} a los ${result.elapsed} ms (límite 3 s)`,
+    );
   });
 
   test('headers incompletos reciben 408 JSON al vencer GATEWAY_HEADERS_TIMEOUT_SECONDS', async () => {
@@ -56,6 +58,8 @@ describe('timeouts del gateway contra cuerpos y headers lentos', () => {
     });
     const body = assertTimeoutJson(result);
     assert.ok(result.elapsed >= 1500 && result.elapsed < 5000, `cortó en ${result.elapsed} ms`);
-    console.log(`[headers lentos] 408 ${JSON.stringify(body)} a los ${result.elapsed} ms (límite 2 s)`);
+    console.log(
+      `[headers lentos] 408 ${JSON.stringify(body)} a los ${result.elapsed} ms (límite 2 s)`,
+    );
   });
 });
