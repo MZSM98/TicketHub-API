@@ -190,6 +190,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -254,6 +256,8 @@ paths:
           $ref: '#/components/responses/EventNotFound'
         '409':
           $ref: '#/components/responses/EventNotEditable'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -318,6 +322,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
     delete:
@@ -457,6 +463,8 @@ paths:
                       reservationId: 4990
         '410':
           $ref: '#/components/responses/EventNotAvailable'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '500':
           description: Unexpected concurrency failure (CU-06 EX1), for example a deadlock after retries.
           content:
@@ -629,6 +637,8 @@ paths:
                   status: CANCELLED
         '410':
           $ref: '#/components/responses/ReservationExpired'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/reservations/{reservationId}/release:
     parameters:
@@ -711,6 +721,8 @@ paths:
                 message: La reserva no se puede confirmar
                 details:
                   status: CONFIRMED
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/zones:
     get:
@@ -1030,6 +1042,8 @@ components:
         items:
           type: array
           minItems: 1
+          maxItems: 10
+          description: At most `MAX_TICKETS_PER_RESERVATION` (default 10) items.
           items:
             oneOf:
               - $ref: '#/components/schemas/SeatItemInput'

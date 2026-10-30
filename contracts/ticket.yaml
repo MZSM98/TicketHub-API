@@ -214,6 +214,8 @@ paths:
                   value:
                     code: TICKET_CANCELLED
                     message: Acceso Denegado. El boleto fue cancelado
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '422':
           description: The QR signature is not valid (fake ticket), or the ticket is for another event.
           content:
@@ -286,6 +288,8 @@ paths:
           $ref: './common.yaml#/components/responses/ValidationError'
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '500':
           description: QR generation or storage failed; nothing was saved (CU-09 EX1). PurchaseService queues a retry.
           content:
