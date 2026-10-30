@@ -129,7 +129,9 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-}
     ports:
       - '${GATEWAY_BIND:-0.0.0.0}:${GATEWAY_HOST_PORT:-8080}:8080'
-    depends_on: [identity-service, catalog-service]
+    depends_on:
+      identity-service: { condition: service_healthy }
+      catalog-service: { condition: service_healthy }
 
 networks:
   tickethub:

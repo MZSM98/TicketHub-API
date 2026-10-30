@@ -50,6 +50,18 @@ systemctl restart tickethub-firewall.service
 systemctl restart docker
 /usr/local/sbin/tickethub-firewall "$LOCAL_IP" "$PEER_IP" "$PORTS"
 
+if [ "$ROLE" = "vm1" ]; then
+  echo "Esperando MySQL en $PEER_IP:3306"
+  for i in $(seq 1 120); do
+    timeout 2 bash -c "</dev/tcp/$PEER_IP/3306" 2>/dev/null && break
+    if [ "$i" = 120 ]; then
+      echo "MySQL de $PEER_IP no responde; levanta vm2 primero" >&2
+      exit 1
+    fi
+    sleep 5
+  done
+fi
+
 $COMPOSE up -d --build
 
 if [ "$ROLE" = "vm1" ]; then
