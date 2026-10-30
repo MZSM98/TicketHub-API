@@ -100,6 +100,26 @@ describe('URLs absolutas según el host de cada petición', () => {
     assert.equal(body.posterUrl, `http://localhost:18080/api/v1${poster()}`);
   });
 
+  test('detrás de un túnel de confianza (TRUST_PROXY) -> https y el host público del túnel', async () => {
+    const trusted = new URL(process.env.GATEWAY_TRUSTED_URL ?? GATEWAY).origin;
+    const tunnel = await getEvent(trusted, {
+      host: 'demo.trycloudflare.com',
+      'x-forwarded-proto': 'https',
+    });
+    assert.equal(tunnel.body.posterUrl, `https://demo.trycloudflare.com/api/v1${poster()}`);
+    const rewritten = await getEvent(trusted, {
+      host: 'gateway:8080',
+      'x-forwarded-proto': 'https',
+      'x-forwarded-host': 'abc.ngrok-free.app',
+    });
+    assert.equal(rewritten.body.posterUrl, `https://abc.ngrok-free.app/api/v1${poster()}`);
+    const untrusted = await getEvent(s.gatewayOrigin, {
+      host: 'demo.trycloudflare.com',
+      'x-forwarded-proto': 'https',
+    });
+    assert.equal(untrusted.body.posterUrl, `http://demo.trycloudflare.com/api/v1${poster()}`);
+  });
+
   test('Host inválido -> PUBLIC_BASE_URL', async () => {
     for (const host of ['evil.com/ruta', 'user@evil.com', 'bad_host!:80', 'localhost:99999']) {
       const { status, body } = await getEvent(s.gatewayOrigin, { host });
