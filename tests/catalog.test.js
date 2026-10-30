@@ -16,6 +16,7 @@ import {
   INTERNAL_TOKEN,
   INVENTORY,
   login,
+  PURCHASE,
   RUN,
 } from './helpers.js';
 
@@ -808,7 +809,12 @@ describe('CatalogService (catalog.yaml)', () => {
       assert.ok(summary.events.upcoming >= 2 && summary.events.upcoming <= byStatus.PUBLISHED);
       assert.ok(summary.venues.total >= 1);
       assert.ok(summary.users.byRole.ORGANIZER >= 2 && summary.users.byRole.STAFF >= 2);
-      assert.deepEqual(summary.sales, fakes.sales);
+      const sales = await call('GET', '/internal/stats/sales', {
+        base: PURCHASE,
+        headers: internal,
+      });
+      assert.equal(sales.res.status, 200);
+      assert.deepEqual(summary.sales, sales.body, 'ventas reales de PurchaseService');
       assert.deepEqual(summary.unavailableSections, []);
     });
 

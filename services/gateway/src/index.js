@@ -2,15 +2,18 @@ import http from 'node:http';
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
+import { forwardBody, limitBody } from './body-limit.js';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
 import { parseTrustedProxies } from './trust.js';
 import { checkJwtSecret, checkSecret } from './secret.js';
+import { serverTimeouts } from './timeouts.js';
 
 const API_PREFIX = '/api/v1';
 const port = Number(process.env.PORT ?? 8080);
 const jwtSecret = checkJwtSecret(process.env.JWT_SECRET);
 const forwardSecret = checkSecret('GATEWAY_FORWARD_SECRET', process.env.GATEWAY_FORWARD_SECRET);
+const timeouts = serverTimeouts(process.env);
 const isTrustedProxy = parseTrustedProxies(process.env.TRUST_PROXY);
 const SERVICES_WITH_FORWARD_SECRET = new Set(['catalog']);
 const PROXY_TIMEOUT_MS = 15_000;
@@ -61,6 +64,7 @@ const proxies = Object.fromEntries(
       agent: proxyAgent,
       proxyTimeout: PROXY_TIMEOUT_MS,
       on: {
+        proxyReq: forwardBody,
         error: (_err, _req, res) => {
           if (typeof res.writeHead !== 'function') return res.destroy();
           sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Servicio temporalmente inactivo');
@@ -100,13 +104,23 @@ app.use(API_PREFIX, (req, res, next) => {
     sendSecret: SERVICES_WITH_FORWARD_SECRET.has(service),
     isTrustedProxy,
   });
-  return proxies[service](req, res, next);
+  return limitBody(req, res, () => proxies[service](req, res, next));
 });
 
 app.use((_req, res) => sendError(res, 404, 'NOT_FOUND', 'Recurso no encontrado'));
 
-const server = app.listen(port, () => {
-  console.log(`gateway escuchando en el puerto ${port}`);
+const server = http.createServer(
+  {
+    requestTimeout: timeouts.requestTimeoutMs,
+    headersTimeout: timeouts.headersTimeoutMs,
+    connectionsCheckingInterval: timeouts.checkIntervalMs,
+  },
+  app,
+);
+server.listen(port, () => {
+  console.log(
+    `gateway escuchando en el puerto ${port} (requestTimeout ${timeouts.requestTimeoutMs} ms, headersTimeout ${timeouts.headersTimeoutMs} ms)`,
+  );
 });
 
 process.on('SIGTERM', () => server.close(() => process.exit(0)));

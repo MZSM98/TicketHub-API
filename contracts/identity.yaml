@@ -78,6 +78,8 @@ paths:
           $ref: './common.yaml#/components/responses/ValidationError'
         '409':
           $ref: '#/components/responses/EmailAlreadyRegistered'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '500':
           $ref: './common.yaml#/components/responses/InternalError'
 
@@ -134,6 +136,8 @@ paths:
                 message: Credenciales inválidas
         '403':
           $ref: '#/components/responses/AccountSuspended'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -173,6 +177,8 @@ paths:
           $ref: '#/components/responses/InvalidRefreshToken'
         '403':
           $ref: '#/components/responses/AccountSuspended'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -199,6 +205,8 @@ paths:
           description: Refresh token revoked.
         '400':
           $ref: './common.yaml#/components/responses/ValidationError'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /users/me:
     get:
@@ -255,6 +263,8 @@ paths:
                   value:
                     code: UNAUTHORIZED
                     message: Sesión no válida o expirada, inicie sesión de nuevo
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /admin/users:
     get:
@@ -383,6 +393,8 @@ paths:
               example:
                 code: CANNOT_MODIFY_SELF
                 message: No puede cambiar el estado de su propia cuenta
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /admin/organizers:
     post:
@@ -431,6 +443,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/EmailAlreadyRegistered'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /organizer/staff:
     get:
@@ -516,6 +530,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/EmailAlreadyRegistered'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/users/{userId}:
     parameters:

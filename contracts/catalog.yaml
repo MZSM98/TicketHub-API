@@ -149,6 +149,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/VenueNotFound'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /events/{eventId}:
     parameters:
@@ -222,6 +224,8 @@ paths:
                     message: El recinto no existe
         '409':
           $ref: '#/components/responses/InvalidEventState'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
     delete:
       tags: [Events]
       operationId: deleteEvent
@@ -309,6 +313,8 @@ paths:
                   value:
                     code: EVENT_HAS_NO_ZONES
                     message: Configure al menos una zona antes de publicar
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           description: InventoryService did not answer, so the zones could not be checked before publishing.
           content:
@@ -545,6 +551,8 @@ paths:
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
           $ref: './common.yaml#/components/responses/Forbidden'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /venues/{venueId}:
     parameters:
@@ -597,6 +605,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/VenueNotFound'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
     delete:
       tags: [Venues]
       operationId: deleteVenue

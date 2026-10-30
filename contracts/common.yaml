@@ -111,6 +111,19 @@ components:
               fields:
                 - field: title
                   issue: required
+    PayloadTooLarge:
+      description: |
+        The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or
+        cuts the stream when a chunked body goes over the limit; each service applies the same limit.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PAYLOAD_TOO_LARGE
+            message: El cuerpo de la petición es demasiado grande
+            details:
+              limit: 102400
     Unauthorized:
       description: Missing, invalid or expired token.
       content:

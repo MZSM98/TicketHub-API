@@ -5,6 +5,7 @@ import {
   confirmAction,
   releaseAction,
   reservationNotFound,
+  revokeSaleAction,
   withReservation,
 } from '../reservations.js';
 import { toZone, ZONE_COLUMNS } from '../zones.js';
@@ -14,7 +15,10 @@ export const router = Router();
 const reservationId = (req) => parseId(req.params.reservationId, reservationNotFound);
 
 router.get('/internal/reservations/:reservationId', requireInternal, async (req, res) => {
-  res.json(await withReservation(reservationId(req)));
+  const id = reservationId(req);
+  const reservation = await withReservation(id);
+  const [row] = await query('SELECT purchase_id FROM reservations WHERE id = ?', [id]);
+  res.json({ ...reservation, purchaseId: row?.purchase_id ?? null });
 });
 
 router.post(
@@ -30,6 +34,16 @@ router.post(
 router.post('/internal/reservations/:reservationId/release', requireInternal, async (req, res) => {
   res.json(await withReservation(reservationId(req), releaseAction));
 });
+
+router.post(
+  '/internal/reservations/:reservationId/revoke-sale',
+  requireInternal,
+  async (req, res) => {
+    const id = reservationId(req);
+    const { purchaseId } = validate(req.body, { purchaseId: { type: 'id', required: true } });
+    res.json(await withReservation(id, revokeSaleAction(purchaseId)));
+  },
+);
 
 const onlyOneFilter = () =>
   new HttpError(

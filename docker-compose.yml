@@ -175,6 +175,17 @@ services:
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER}
       PAYMENT_MAX_ATTEMPTS: ${PAYMENT_MAX_ATTEMPTS}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_API_BASE: ${STRIPE_API_BASE:-https://api.stripe.com}
+      STRIPE_TIMEOUT_MS: ${STRIPE_TIMEOUT_MS:-10000}
+      TICKET_RETRY_SECONDS: ${TICKET_RETRY_SECONDS:-30}
+      PAYMENT_SWEEP_SECONDS: ${PAYMENT_SWEEP_SECONDS:-60}
+      PAYMENT_RECONCILE_AFTER_SECONDS: ${PAYMENT_RECONCILE_AFTER_SECONDS:-60}
+      PAYMENT_RECOVERY_MAX_ATTEMPTS: ${PAYMENT_RECOVERY_MAX_ATTEMPTS:-20}
+      PAYMENT_CLAIM_SECONDS: ${PAYMENT_CLAIM_SECONDS:-}
+      TICKET_RETRY_BACKOFF_SECONDS: ${TICKET_RETRY_BACKOFF_SECONDS:-30}
+      TICKET_RETRY_MAX_SECONDS: ${TICKET_RETRY_MAX_SECONDS:-3600}
+      TICKET_RETRY_BATCH: ${TICKET_RETRY_BATCH:-50}
+      TICKET_RETRY_MAX_ATTEMPTS: ${TICKET_RETRY_MAX_ATTEMPTS:-50}
     depends_on:
       mysql: { condition: service_healthy }
 
@@ -206,6 +217,8 @@ services:
       PORT: 8080
       JWT_SECRET: ${JWT_SECRET}
       GATEWAY_FORWARD_SECRET: ${GATEWAY_FORWARD_SECRET}
+      GATEWAY_REQUEST_TIMEOUT_SECONDS: ${GATEWAY_REQUEST_TIMEOUT_SECONDS:-60}
+      GATEWAY_HEADERS_TIMEOUT_SECONDS: ${GATEWAY_HEADERS_TIMEOUT_SECONDS:-15}
       TRUST_PROXY: ${TRUST_PROXY:-}
     ports:
       - '${GATEWAY_HOST_PORT}:8080'
@@ -240,6 +253,9 @@ services:
       - ./mock:/app/mock:ro
       - ./services/gateway/src:/app/services/gateway/src:ro
       - ./services/common/src:/app/services/common/src:ro
+      - ./services/purchase/src/config.js:/app/services/purchase/src/config.js:ro
+      - ./services/purchase/src/schema.js:/app/services/purchase/src/schema.js:ro
+      - ./services/inventory/src/config.js:/app/services/inventory/src/config.js:ro
     command: ['node', '--test', '--test-concurrency=1', '--test-reporter=spec', 'tests/']
     environment:
       GATEWAY_URL: http://gateway:8080/api/v1

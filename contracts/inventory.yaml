@@ -190,6 +190,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -254,6 +256,8 @@ paths:
           $ref: '#/components/responses/EventNotFound'
         '409':
           $ref: '#/components/responses/EventNotEditable'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -318,6 +322,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
     delete:
@@ -354,7 +360,8 @@ paths:
       description: |
         **Role:** BUYER. All items must belong to `eventId`, which must be PUBLISHED and in the future.
         A buyer can have only one ACTIVE reservation at a time. Max `MAX_TICKETS_PER_RESERVATION`
-        tickets (default 10). Each item is either `{ seatId }` (NUMBERED zone) or
+        tickets (default 10). The hard limit is 10: InventoryService refuses to start when
+        `MAX_TICKETS_PER_RESERVATION` is not an integer between 1 and 10. Each item is either `{ seatId }` (NUMBERED zone) or
         `{ zoneId, quantity }` (GENERAL zone).
       requestBody:
         required: true
@@ -459,6 +466,8 @@ paths:
                       reservationId: 4990
         '410':
           $ref: '#/components/responses/EventNotAvailable'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '500':
           description: Unexpected concurrency failure (CU-06 EX1), for example a deadlock after retries.
           content:
@@ -563,17 +572,19 @@ paths:
       operationId: internalGetReservation
       summary: Check a reservation before charging (internal, CU-08 verificarVigenciaReserva)
       description: |
-        **Internal** (service-to-service). PurchaseService reads status, owner, items and `total`.
-        It must reject the payment unless `status=ACTIVE` and `expiresAt` is in the future.
+        **Internal** (service-to-service). PurchaseService reads status, owner, items, `total` and
+        `purchaseId`. It must reject the payment unless `status=ACTIVE` and `expiresAt` is in the
+        future. `purchaseId` lets PurchaseService recognize a reservation CONFIRMED by its own
+        purchase (for example after a failed capture) and finish that purchase instead of undoing it.
       security:
         - internalAuth: []
       responses:
         '200':
-          description: Reservation (status already reflects expiration).
+          description: Reservation (status already reflects expiration) plus `purchaseId`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Reservation'
+                $ref: '#/components/schemas/InternalReservation'
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '404':
@@ -629,6 +640,8 @@ paths:
                   status: CANCELLED
         '410':
           $ref: '#/components/responses/ReservationExpired'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/reservations/{reservationId}/release:
     parameters:
@@ -662,6 +675,57 @@ paths:
               example:
                 code: RESERVATION_ALREADY_CONFIRMED
                 message: La reserva ya fue pagada y no se puede cancelar
+
+  /internal/reservations/{reservationId}/revoke-sale:
+    parameters:
+      - $ref: '#/components/parameters/ReservationId'
+    post:
+      tags: [Internal]
+      operationId: internalRevokeSale
+      summary: Undo a confirmed sale whose capture was definitively declined (internal, CU-08)
+      description: |
+        **Internal** (service-to-service). Called by PurchaseService when the provider definitively
+        rejects the capture after `confirm-sale`. In one transaction: seats SOLD -> AVAILABLE,
+        `soldCount` goes down, reservation CONFIRMED -> CANCELLED and `purchaseId` is cleared.
+        Idempotent: a CANCELLED or EXPIRED reservation returns 200 without changes.
+      security:
+        - internalAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purchaseId]
+              properties:
+                purchaseId:
+                  $ref: './common.yaml#/components/schemas/Id'
+            example:
+              purchaseId: 8001
+      responses:
+        '200':
+          description: Sale revoked (or the reservation was already CANCELLED/EXPIRED).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ReservationNotFound'
+        '409':
+          description: The reservation is ACTIVE, or CONFIRMED by a different purchase.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: INVALID_RESERVATION_STATE
+                message: La venta de la reserva no se puede revocar
+                details:
+                  status: CONFIRMED
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/zones:
     get:
@@ -1007,6 +1071,8 @@ components:
         items:
           type: array
           minItems: 1
+          maxItems: 10
+          description: At most `MAX_TICKETS_PER_RESERVATION` (integer 1-10, default 10) items; never more than 10.
           items:
             oneOf:
               - $ref: '#/components/schemas/SeatItemInput'
@@ -1035,6 +1101,19 @@ components:
           minimum: 1
         unitPrice:
           $ref: './common.yaml#/components/schemas/Money'
+    InternalReservation:
+      description: Reservation as seen by PurchaseService. Only returned by the internal endpoint.
+      allOf:
+        - $ref: '#/components/schemas/Reservation'
+        - type: object
+          required: [purchaseId]
+          properties:
+            purchaseId:
+              type: integer
+              format: int64
+              minimum: 1
+              nullable: true
+              description: Purchase that confirmed the sale (set when `status=CONFIRMED`), otherwise null.
     Reservation:
       type: object
       required: [id, userId, eventId, status, createdAt, expiresAt, secondsRemaining, total, currency, items]
