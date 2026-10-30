@@ -23,6 +23,7 @@ import {
   likeContains,
   ownedEvent,
   STATUSES,
+  publicBase,
   toEvent,
   toSeconds,
   venueNotFound,
@@ -50,7 +51,7 @@ const EVENT_RULES = {
 
 const TRANSITIONS = { DRAFT: ['PUBLISHED', 'CANCELLED'], PUBLISHED: ['CANCELLED'], CANCELLED: [] };
 
-async function eventPage(where, params, paging, order) {
+async function eventPage(req, where, params, paging, order) {
   const [{ total }] = await query(
     `SELECT COUNT(*) AS total FROM events e JOIN venues v ON v.id = e.venue_id WHERE ${where}`,
     params,
@@ -60,7 +61,11 @@ async function eventPage(where, params, paging, order) {
      LIMIT ${paging.pageSize} OFFSET ${(paging.page - 1) * paging.pageSize}`,
     params,
   );
-  return pageOf(rows.map(toEvent), total, paging);
+  return pageOf(
+    rows.map((row) => toEvent(row, publicBase(req))),
+    total,
+    paging,
+  );
 }
 
 router.get('/events', async (req, res) => {
@@ -99,7 +104,7 @@ router.get('/events', async (req, res) => {
     conditions.push('e.starts_at <= ?');
     params.push(q.to);
   }
-  res.json(await eventPage(conditions.join(' AND '), params, q, 'e.starts_at, e.id'));
+  res.json(await eventPage(req, conditions.join(' AND '), params, q, 'e.starts_at, e.id'));
 });
 
 router.post('/events', ...organizer, async (req, res) => {
@@ -122,7 +127,7 @@ router.post('/events', ...organizer, async (req, res) => {
     if (isMissingParent(err)) throw venueNotFound();
     throw err;
   }
-  res.status(201).json(toEvent(await findEventRow(result.insertId)));
+  res.status(201).json(toEvent(await findEventRow(result.insertId), publicBase(req)));
 });
 
 router.get('/organizer/events', ...organizer, async (req, res) => {
@@ -133,11 +138,11 @@ router.get('/organizer/events', ...organizer, async (req, res) => {
     conditions.push('e.status = ?');
     params.push(q.status);
   }
-  res.json(await eventPage(conditions.join(' AND '), params, q, 'e.starts_at, e.id'));
+  res.json(await eventPage(req, conditions.join(' AND '), params, q, 'e.starts_at, e.id'));
 });
 
 router.get('/events/:eventId', optionalAuth, async (req, res) => {
-  res.json(toEvent(await visibleEvent(req)));
+  res.json(toEvent(await visibleEvent(req), publicBase(req)));
 });
 
 router.put('/events/:eventId', ...organizer, async (req, res) => {
@@ -167,7 +172,7 @@ router.put('/events/:eventId', ...organizer, async (req, res) => {
   if (result.affectedRows === 0 && updated.status === 'CANCELLED') {
     throw invalidEventState(updated.status);
   }
-  res.json(toEvent(updated));
+  res.json(toEvent(updated, publicBase(req)));
 });
 
 router.delete('/events/:eventId', ...organizer, async (req, res) => {
@@ -208,7 +213,7 @@ router.patch('/events/:eventId/status', ...organizer, async (req, res) => {
   const current = await findEventRow(event.id);
   if (!current) throw eventNotFound();
   if (result.affectedRows === 0) throw invalidTransition(current.status, to);
-  res.json(toEvent(current));
+  res.json(toEvent(current, publicBase(req)));
 });
 
 const posterNotFound = () => new HttpError(404, 'POSTER_NOT_FOUND', 'El evento no tiene póster');
@@ -259,5 +264,5 @@ router.put('/events/:eventId/poster', ...organizer, async (req, res) => {
     throw err;
   }
   if (previousKey) await removeObject(previousKey);
-  res.json(toEvent(await findEventRow(event.id)));
+  res.json(toEvent(await findEventRow(event.id), publicBase(req)));
 });

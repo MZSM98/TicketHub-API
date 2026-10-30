@@ -1,3 +1,6 @@
+import { requiredSecret } from '@tickethub/common/env';
+import { parseAllowedHosts } from '@tickethub/common/public-url';
+
 function required(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Falta la variable de entorno ${name}`);
@@ -8,6 +11,8 @@ export const config = {
   port: Number(process.env.PORT ?? 3002),
   internalToken: required('INTERNAL_TOKEN'),
   publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, ''),
+  gatewaySecret: requiredSecret('GATEWAY_FORWARD_SECRET'),
+  allowedHosts: parseAllowedHosts(process.env.PUBLIC_HOSTS_ALLOWED),
   internalTimeoutMs: Number(process.env.INTERNAL_TIMEOUT_MS ?? 3000),
   minio: {
     endpoint: required('MINIO_ENDPOINT'),

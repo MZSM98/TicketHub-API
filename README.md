@@ -160,6 +160,10 @@ Compras, historial y ventas (CU-08, CU-09, CU-13), según `contracts/purchase.ya
 
 Para probar contra Stripe en modo prueba, pon en `.env` `STRIPE_SECRET_KEY` con tu llave `sk_test_...` y `STRIPE_API_BASE=https://api.stripe.com`, levanta el stack normal (sin `docker-compose.test.yml`) y paga una reserva con `pm_card_visa` o `pm_card_chargeDeclined`.
 
+## URLs públicas por host
+
+Las URLs absolutas que devuelve la API (hoy `posterUrl` de CatalogService) se arman con el host con el que el cliente llamó al gateway, así la app de escritorio (`localhost`), el emulador de Android (`10.0.2.2`) y un teléfono en la red local (IP LAN) funcionan a la vez contra el mismo stack. El gateway borra `Forwarded`, `X-Forwarded-*` y `X-Real-IP` que mande el cliente y pone `X-Forwarded-Host` (el `Host` de la petición), `X-Forwarded-Proto` (`http` o `https`) y `X-Tickethub-Gateway` con `GATEWAY_FORWARD_SECRET`. El servicio solo usa esas cabeceras si el secreto coincide, el host es un nombre o IP con puerto opcional (sin ruta, usuario ni espacios) y, si `PUBLIC_HOSTS_ALLOWED` tiene valores (nombres separados por comas, sin puerto), el nombre está en la lista. En cualquier otro caso, incluida una llamada directa al servicio, se usa `PUBLIC_BASE_URL`.
+
 ## MinIO
 
 Cada servicio entra a MinIO con su propio usuario, limitado a su bucket: CatalogService (`CATALOG_MINIO_ACCESS_KEY`, `CATALOG_MINIO_SECRET_KEY`) solo a `MINIO_BUCKET_POSTERS` y TicketService (`TICKET_MINIO_ACCESS_KEY`, `TICKET_MINIO_SECRET_KEY`) solo a `MINIO_BUCKET_QR`. Ninguno puede ver otros buckets, crear o borrar buckets, ni usar la administración. El usuario root (`MINIO_ROOT_USER`) solo lo usa el contenedor `minio-init`, que al levantar el stack crea los buckets, las políticas y los usuarios (`minio/init.sh`). Se puede volver a ejecutar sin problema, por ejemplo después de cambiar una contraseña en `.env`:

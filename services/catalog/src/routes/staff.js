@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { query } from '@tickethub/common/db';
 import { authenticate, HttpError, notFound, parseId, requireRole } from '@tickethub/common/http';
-import { EVENT_SELECT, eventNotFound, isMissingParent, ownedEvent, toEvent } from '../events.js';
+import {
+  EVENT_SELECT,
+  eventNotFound,
+  isMissingParent,
+  ownedEvent,
+  publicBase,
+  toEvent,
+} from '../events.js';
 import { getUser } from '../services.js';
 
 export const router = Router();
@@ -79,5 +86,5 @@ router.get('/staff/events', authenticate, requireRole('STAFF'), async (req, res)
      WHERE s.user_id = ? AND e.status <> 'CANCELLED' ORDER BY e.starts_at, e.id`,
     [req.auth.userId],
   );
-  res.json(rows.map(toEvent));
+  res.json(rows.map((row) => toEvent(row, publicBase(req))));
 });
