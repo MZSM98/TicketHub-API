@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { before, describe, test } from 'node:test';
-import { parseHost, publicBaseUrl } from '../services/common/src/public-url.js';
+import { parseAllowedHosts, parseHost, publicBaseUrl } from '../services/common/src/public-url.js';
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
@@ -156,8 +156,37 @@ describe('URLs absolutas según el host de cada petición', () => {
     assert.equal(publicBaseUrl(fwd('h', 'ftp'), opts), 'http://fb/api/v1');
     assert.equal(publicBaseUrl(fwd('h', 'http', 'otro'), opts), 'http://fb/api/v1');
     assert.equal(publicBaseUrl({}, opts), 'http://fb/api/v1');
-    const allow = { ...opts, allowedHosts: ['localhost', '10.0.2.2'] };
+    const allow = { ...opts, allowedHosts: parseAllowedHosts('localhost, 10.0.2.2') };
     assert.equal(publicBaseUrl(fwd('10.0.2.2:18080'), allow), 'http://10.0.2.2:18080/api/v1');
     assert.equal(publicBaseUrl(fwd('evil.com'), allow), 'http://fb/api/v1');
+  });
+
+  test('unidad: rangos CIDR en PUBLIC_HOSTS_ALLOWED junto con nombres', () => {
+    const secret = 's'.repeat(32);
+    const fwd = (host) => ({
+      'x-forwarded-host': host,
+      'x-forwarded-proto': 'http',
+      'x-tickethub-gateway': secret,
+    });
+    const opts = {
+      fallback: 'http://fb/api/v1',
+      gatewaySecret: secret,
+      allowedHosts: parseAllowedHosts('localhost, 192.168.0.0/16, 10.0.0.0/8, fd00::/8'),
+    };
+    const cases = {
+      '192.168.1.50:18080': 'http://192.168.1.50:18080/api/v1',
+      '10.0.2.2:18080': 'http://10.0.2.2:18080/api/v1',
+      'localhost:18080': 'http://localhost:18080/api/v1',
+      '[fd00::1]:8080': 'http://[fd00::1]:8080/api/v1',
+      '172.16.0.5:18080': 'http://fb/api/v1',
+      '192.169.0.1': 'http://fb/api/v1',
+      'evil.com': 'http://fb/api/v1',
+    };
+    for (const [host, expected] of Object.entries(cases)) {
+      assert.equal(publicBaseUrl(fwd(host), opts), expected, host);
+    }
+    for (const bad of ['10.0.0.0/33', 'abc/8', '10.0.0/8', '::/129', '192.168.0.0/']) {
+      assert.throws(() => parseAllowedHosts(`localhost,${bad}`), /rango inválido/, bad);
+    }
   });
 });
