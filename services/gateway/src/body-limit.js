@@ -6,12 +6,25 @@ const hasBody = (req) =>
 
 const isMultipart = (req) => /^multipart\/form-data/i.test(req.headers['content-type'] ?? '');
 
+const DRAIN_LIMIT_BYTES = 1024 * 1024;
+const DRAIN_TIMEOUT_MS = 1000;
+
+function cutAfterResponse(req, res) {
+  let drained = 0;
+  const cut = () => {
+    if (!req.complete) req.destroy();
+  };
+  req.on('data', (chunk) => {
+    drained += chunk.length;
+    if (drained > DRAIN_LIMIT_BYTES) cut();
+  });
+  req.resume();
+  res.once('finish', () => setTimeout(cut, DRAIN_TIMEOUT_MS).unref());
+}
+
 function tooLarge(req, res) {
   if (!res.headersSent) {
-    res.writeHead(413, {
-      'Content-Type': 'application/json; charset=utf-8',
-      Connection: 'close',
-    });
+    res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(
       JSON.stringify({
         code: 'PAYLOAD_TOO_LARGE',
@@ -20,7 +33,7 @@ function tooLarge(req, res) {
       }),
     );
   }
-  res.once('finish', () => req.destroy());
+  cutAfterResponse(req, res);
 }
 
 export function limitBody(req, res, next) {
