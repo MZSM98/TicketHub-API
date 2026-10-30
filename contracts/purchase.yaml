@@ -12,7 +12,12 @@ info:
     (`GET /internal/reservations/{id}`) -> authorize the payment (manual capture) ->
     `POST /internal/reservations/{id}/confirm-sale` -> capture the payment -> save purchase ->
     `POST /internal/tickets/issue` in TicketService. If confirm-sale fails, the authorization is
-    cancelled and the buyer is not charged.
+    cancelled and the buyer is not charged. If the provider definitively rejects the capture, the
+    authorization is cancelled, the sale is undone through
+    `POST /internal/reservations/{id}/revoke-sale` (seats back to AVAILABLE), the purchase stays
+    DECLINED and the buyer gets 402 `PAYMENT_ATTEMPTS_EXHAUSTED`. A capture that fails for a
+    transient reason (timeout, 5xx, 429, invalid response) answers 503 and is retried; the seats
+    stay SOLD until it resolves.
     If ticket issuance fails, the purchase is still PAID and the issue call is queued for retry
     (CU-09 EX1); the response then says `ticketIssuance: PENDING`.
 
@@ -98,7 +103,7 @@ paths:
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '402':
-          description: The provider declined the charge (CU-08 FA1).
+          description: The provider declined the charge or its capture (CU-08 FA1).
           content:
             application/json:
               schema:
@@ -117,6 +122,13 @@ paths:
                   value:
                     code: PAYMENT_ATTEMPTS_EXHAUSTED
                     message: Pago declinado. Se agotaron los intentos y los asientos fueron liberados
+                    details:
+                      attemptsRemaining: 0
+                captureDeclined:
+                  summary: The provider rejected the capture; the authorization was cancelled and the seats were released
+                  value:
+                    code: PAYMENT_ATTEMPTS_EXHAUSTED
+                    message: Pago rechazado por la pasarela. No se hizo ningún cargo y los asientos fueron liberados
                     details:
                       attemptsRemaining: 0
         '403':
@@ -156,6 +168,8 @@ paths:
               example:
                 code: RESERVATION_EXPIRED
                 message: Tiempo agotado
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '502':
           description: The payment provider returned an invalid or unexpected response. No sale was confirmed.
           content:
