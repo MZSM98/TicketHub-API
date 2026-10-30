@@ -1,0 +1,139 @@
+name: tickethub-vm1
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [tickethub]
+
+x-db-env: &db-env
+  NODE_ENV: ${NODE_ENV}
+  MYSQL_HOST: ${VM2_IP:-192.168.56.11}
+  MYSQL_PORT: ${VM2_MYSQL_PORT:-3306}
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+  JWT_SECRET: ${JWT_SECRET}
+
+x-service-urls: &service-urls
+  IDENTITY_SERVICE_URL: http://identity-service:3001
+  CATALOG_SERVICE_URL: http://catalog-service:3002
+  INVENTORY_SERVICE_URL: http://${VM2_IP:-192.168.56.11}:3003
+  PURCHASE_SERVICE_URL: http://${VM2_IP:-192.168.56.11}:3004
+  TICKET_SERVICE_URL: http://${VM2_IP:-192.168.56.11}:3005
+
+services:
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@127.0.0.1:9000
+    volumes:
+      - minio-data:/data
+    ports:
+      - '127.0.0.1:9001:9001'
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [tickethub]
+
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest
+    restart: 'no'
+    entrypoint: ['sh', '/init/init.sh']
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
+      MINIO_BUCKET_QR: ${MINIO_BUCKET_QR}
+      CATALOG_MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
+      CATALOG_MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
+      TICKET_MINIO_ACCESS_KEY: ${TICKET_MINIO_ACCESS_KEY}
+      TICKET_MINIO_SECRET_KEY: ${TICKET_MINIO_SECRET_KEY}
+    volumes:
+      - ../../minio/init.sh:/init/init.sh:ro
+    depends_on:
+      minio: { condition: service_healthy }
+    networks: [tickethub]
+
+  mailpit:
+    image: axllent/mailpit:v1.32
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8025:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [tickethub]
+
+  identity-service:
+    <<: *service-defaults
+    build: { context: ../.., dockerfile: services/identity/Dockerfile }
+    environment:
+      <<: *db-env
+      PORT: 3001
+      DB_NAME: ${IDENTITY_DB_NAME}
+      DB_USER: ${IDENTITY_DB_USER}
+      DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
+      ADMIN_NAME: ${ADMIN_NAME:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: 'false'
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      MAIL_FROM: ${MAIL_FROM}
+    depends_on:
+      mailpit: { condition: service_healthy }
+
+  catalog-service:
+    <<: *service-defaults
+    build: { context: ../.., dockerfile: services/catalog/Dockerfile }
+    environment:
+      <<: [*db-env, *service-urls]
+      PORT: 3002
+      DB_NAME: ${CATALOG_DB_NAME}
+      DB_USER: ${CATALOG_DB_USER}
+      DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      GATEWAY_FORWARD_SECRET: ${GATEWAY_FORWARD_SECRET}
+      PUBLIC_HOSTS_ALLOWED: ${PUBLIC_HOSTS_ALLOWED:-}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${CATALOG_MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${CATALOG_MINIO_SECRET_KEY}
+      MINIO_BUCKET_POSTERS: ${MINIO_BUCKET_POSTERS}
+    ports:
+      - '${VM1_IP:-192.168.56.10}:3002:3002'
+    depends_on:
+      minio-init: { condition: service_completed_successfully }
+
+  gateway:
+    <<: *service-defaults
+    build: { context: ../.., dockerfile: services/gateway/Dockerfile }
+    environment:
+      <<: *service-urls
+      NODE_ENV: ${NODE_ENV}
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET}
+      GATEWAY_FORWARD_SECRET: ${GATEWAY_FORWARD_SECRET}
+      GATEWAY_REQUEST_TIMEOUT_SECONDS: ${GATEWAY_REQUEST_TIMEOUT_SECONDS:-60}
+      GATEWAY_HEADERS_TIMEOUT_SECONDS: ${GATEWAY_HEADERS_TIMEOUT_SECONDS:-15}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+    ports:
+      - '${GATEWAY_BIND:-0.0.0.0}:${GATEWAY_HOST_PORT:-8080}:8080'
+    depends_on: [identity-service, catalog-service]
+
+networks:
+  tickethub:
+    driver: bridge
+
+volumes:
+  minio-data:
