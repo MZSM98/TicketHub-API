@@ -24,6 +24,7 @@ function cutAfterResponse(req, res) {
 
 function tooLarge(req, res) {
   if (!res.headersSent) {
+    res.shouldKeepAlive = true;
     res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(
       JSON.stringify({
