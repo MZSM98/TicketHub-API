@@ -17,6 +17,7 @@ export const fakes = {
     delayMs: 0,
     failCancels: false,
     idempotencyErrorFor: new Set(),
+    idempotencyErrorAfterAuthorize: new Set(),
     captureFailures: new Map(),
     requests: [],
     charges: [],
@@ -69,6 +70,12 @@ function paymentIntent(params) {
     attempt: Number(params.get('metadata[attempt]')),
     status: manual ? 'requires_capture' : 'succeeded',
     refunded: false,
+    created: Math.floor(Date.now() / 1000),
+    metadata: Object.fromEntries(
+      [...params.entries()]
+        .filter(([key]) => key.startsWith('metadata['))
+        .map(([key, value]) => [key.slice(9, -1), value]),
+    ),
   };
   if (APPROVED.has(params.get('payment_method'))) {
     fakes.stripe.charges.push(record);
@@ -129,6 +136,31 @@ function intentAction(id, action) {
   return [200, { id, object: 'payment_intent', status: intent.status }];
 }
 
+function listIntents(query) {
+  const since = Number(query.get('created[gte]') ?? 0);
+  const limit = Number(query.get('limit') ?? 10);
+  const all = [...fakes.stripe.intents.values()]
+    .filter((intent) => intent.created >= since)
+    .reverse();
+  const after = query.get('starting_after');
+  const start = after ? all.findIndex((intent) => intent.id === after) + 1 : 0;
+  const page = all.slice(start, start + limit);
+  return [
+    200,
+    {
+      object: 'list',
+      has_more: start + limit < all.length,
+      data: page.map((intent) => ({
+        id: intent.id,
+        object: 'payment_intent',
+        status: intent.status,
+        created: intent.created,
+        metadata: intent.metadata,
+      })),
+    },
+  ];
+}
+
 function stripeRoute(path, params) {
   if (path === '/v1/payment_intents') return paymentIntent(params);
   if (path === '/v1/refunds') {
@@ -162,6 +194,10 @@ async function handleStripe(req, res, url) {
     return send(res, 401, { error: { type: 'invalid_request_error', message: 'Invalid API Key' } });
   }
   if (stripe.mode === 'down') return send(res, 503, { error: { type: 'api_error' } });
+  if (req.method === 'GET' && url.pathname === '/v1/payment_intents') {
+    stripe.lists = (stripe.lists ?? 0) + 1;
+    return send(res, ...listIntents(url.searchParams));
+  }
   if (stripe.failCancels && /\/(cancel|refunds)$/.test(url.pathname)) {
     return send(res, 503, { error: { type: 'api_error' } });
   }
@@ -179,6 +215,19 @@ async function handleStripe(req, res, url) {
       },
     });
   }
+  if (
+    url.pathname === '/v1/payment_intents' &&
+    stripe.idempotencyErrorAfterAuthorize.has(reservationId)
+  ) {
+    stripe.idempotencyErrorAfterAuthorize.delete(reservationId);
+    paymentIntent(params);
+    return send(res, 400, {
+      error: {
+        type: 'idempotency_error',
+        message: 'Keys for idempotent requests can only be used with the same parameters',
+      },
+    });
+  }
   const captured = /^\/v1\/payment_intents\/([^/]+)\/capture$/.exec(url.pathname);
   const failure = captured
     ? stripe.captureFailures.get(stripe.intents.get(captured[1])?.reservationId)
@@ -186,6 +235,10 @@ async function handleStripe(req, res, url) {
   if (failure && failure.times > 0 && failure.mode !== 'drop') {
     failure.times--;
     if (failure.mode === '503') return send(res, 503, { error: { type: 'api_error' } });
+    if (failure.mode === 'garbage') {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      return res.end('<html>proxy error</html>');
+    }
     return send(res, 400, {
       error: {
         type: 'invalid_request_error',
