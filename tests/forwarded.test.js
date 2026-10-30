@@ -29,7 +29,7 @@ describe('TRUST_PROXY y cabeceras reenviadas del gateway', () => {
       '::ffff:172.18.0.1',
       {
         host: 'gateway:8080',
-        'x-forwarded-proto': 'https, http',
+        'x-forwarded-proto': 'http, https',
         'x-forwarded-host': 'demo.trycloudflare.com',
         'x-real-ip': '1.2.3.4',
         'x-tickethub-gateway': 'falso',
@@ -50,6 +50,43 @@ describe('TRUST_PROXY y cabeceras reenviadas del gateway', () => {
     );
     assert.equal(headers['x-forwarded-proto'], 'http');
     assert.equal(headers['x-forwarded-host'], 'abc.ngrok-free.app');
+  });
+
+  test('listas con coma: se toma el último valor, el que agregó el proxy de confianza', () => {
+    const headers = rewrite(
+      '10.0.0.7',
+      {
+        host: 'abc.ngrok-free.app',
+        'x-forwarded-proto': 'http, https',
+        'x-forwarded-host': 'evil.com, abc.ngrok-free.app',
+      },
+      { trust: '10.0.0.7' },
+    );
+    assert.equal(headers['x-forwarded-proto'], 'https');
+    assert.equal(headers['x-forwarded-host'], 'abc.ngrok-free.app');
+  });
+
+  test('X-Forwarded-Host inválido del proxy de confianza usa el Host válido', () => {
+    const invalid = [
+      'evil.com/x',
+      'user@evil.com',
+      'evil.com:99999',
+      'evil.com:0',
+      'a b',
+      '',
+      'abc.ngrok-free.app, evil.com/x',
+      'http://evil.com',
+      '[zz::1]',
+    ];
+    for (const value of invalid) {
+      const headers = rewrite(
+        '10.0.0.7',
+        { host: 'abc.ngrok-free.app', 'x-forwarded-proto': 'https', 'x-forwarded-host': value },
+        { trust: '10.0.0.7' },
+      );
+      assert.equal(headers['x-forwarded-host'], 'abc.ngrok-free.app', value);
+      assert.equal(headers['x-forwarded-proto'], 'https', value);
+    }
   });
 
   test('par fuera de los rangos de confianza no cambia el comportamiento', () => {
