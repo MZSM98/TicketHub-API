@@ -4,12 +4,14 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
+import { parseTrustedProxies } from './trust.js';
 import { checkJwtSecret, checkSecret } from './secret.js';
 
 const API_PREFIX = '/api/v1';
 const port = Number(process.env.PORT ?? 8080);
 const jwtSecret = checkJwtSecret(process.env.JWT_SECRET);
 const forwardSecret = checkSecret('GATEWAY_FORWARD_SECRET', process.env.GATEWAY_FORWARD_SECRET);
+const isTrustedProxy = parseTrustedProxies(process.env.TRUST_PROXY);
 // Sin respuesta del servicio en este tiempo, el gateway responde 503.
 const PROXY_TIMEOUT_MS = 15_000;
 // El timeout del agente también cubre la conexión TCP; proxyTimeout solo cuenta ya conectado.
@@ -101,7 +103,11 @@ app.use(API_PREFIX, (req, res, next) => {
   }
   // Express quita el prefijo de req.url al montar; se restaura para reenviar la ruta completa.
   req.url = req.originalUrl;
-  rewriteForwarded(req, forwardSecret);
+  rewriteForwarded(req, {
+    secret: forwardSecret,
+    sendSecret: true,
+    isTrustedProxy,
+  });
   return proxies[service](req, res, next);
 });
 
