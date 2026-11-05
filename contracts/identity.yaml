@@ -76,6 +76,8 @@ paths:
                 updatedAt: '2026-10-26T15:10:00Z'
         '400':
           $ref: './common.yaml#/components/responses/ValidationError'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/EmailAlreadyRegistered'
         '413':
@@ -136,6 +138,8 @@ paths:
                 message: Credenciales inválidas
         '403':
           $ref: '#/components/responses/AccountSuspended'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
@@ -177,6 +181,8 @@ paths:
           $ref: '#/components/responses/InvalidRefreshToken'
         '403':
           $ref: '#/components/responses/AccountSuspended'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
@@ -205,6 +211,8 @@ paths:
           description: Refresh token revoked.
         '400':
           $ref: './common.yaml#/components/responses/ValidationError'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
@@ -263,6 +271,8 @@ paths:
                   value:
                     code: UNAUTHORIZED
                     message: Sesión no válida o expirada, inicie sesión de nuevo
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
@@ -384,6 +394,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: './common.yaml#/components/responses/NotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: The admin tried to suspend their own account.
           content:
@@ -441,6 +453,8 @@ paths:
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
           $ref: './common.yaml#/components/responses/Forbidden'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/EmailAlreadyRegistered'
         '413':
@@ -528,6 +542,8 @@ paths:
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
           $ref: './common.yaml#/components/responses/Forbidden'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/EmailAlreadyRegistered'
         '413':

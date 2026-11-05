@@ -2,7 +2,8 @@ import http from 'node:http';
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
-import { forwardBody, limitBody } from './body-limit.js';
+import { forwardBody, hasBody, limitBody } from './body-limit.js';
+import { closeAfterResponse, onClientError } from './client-error.js';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
 import { parseTrustedProxies } from './trust.js';
@@ -51,6 +52,7 @@ app.get(`${API_PREFIX}/health`, health);
 
 function sendError(res, status, code, message) {
   if (res.headersSent) return;
+  if (res.req && hasBody(res.req) && !res.req.complete) closeAfterResponse(res.req, res);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ code, message }));
 }
@@ -117,6 +119,7 @@ const server = http.createServer(
   },
   app,
 );
+server.on('clientError', onClientError);
 server.listen(port, () => {
   console.log(
     `gateway escuchando en el puerto ${port} (requestTimeout ${timeouts.requestTimeoutMs} ms, headersTimeout ${timeouts.headersTimeoutMs} ms)`,

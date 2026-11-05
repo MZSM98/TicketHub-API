@@ -124,6 +124,22 @@ components:
             message: El cuerpo de la petición es demasiado grande
             details:
               limit: 102400
+    RequestTimeout:
+      description: |
+        The gateway did not receive the whole request in time: the headers within
+        `GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,
+        within `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON
+        with `Connection: close`, stops reading after a short grace period and closes the
+        connection. Any request can get it; it is listed on every operation with a request body,
+        public or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs
+        about 85 KB/s).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: REQUEST_TIMEOUT
+            message: La petición tardó demasiado en llegar completa; intente de nuevo
     Unauthorized:
       description: Missing, invalid or expired token.
       content:

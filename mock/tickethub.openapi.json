@@ -297,6 +297,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The email already belongs to an account (including soft-deleted ones).",
             "content": {
@@ -754,6 +797,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
             "content": {
@@ -1064,6 +1150,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
             "content": {
@@ -1239,6 +1368,49 @@
                       }
                     ]
                   }
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -1581,6 +1753,49 @@
                       "message": "Sesión no válida o expirada, inicie sesión de nuevo"
                     }
                   }
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -2492,6 +2707,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The admin tried to suspend their own account.",
             "content": {
@@ -2878,6 +3136,49 @@
                 "example": {
                   "code": "FORBIDDEN",
                   "message": "No tiene permisos para realizar esta acción"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -3574,6 +3875,49 @@
                 "example": {
                   "code": "FORBIDDEN",
                   "message": "No tiene permisos para realizar esta acción"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -4428,6 +4772,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
             "content": {
@@ -5103,6 +5490,49 @@
                       "message": "El recinto no existe"
                     }
                   }
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -5819,6 +6249,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Transition not allowed, or the event has no zones yet.",
             "content": {
@@ -6493,6 +6966,49 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -7549,6 +8065,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
             "content": {
@@ -8077,6 +8636,49 @@
                 "example": {
                   "code": "VENUE_NOT_FOUND",
                   "message": "El recinto no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -10419,6 +11021,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The zone is GENERAL, or it already has reserved or sold seats.",
             "content": {
@@ -11169,6 +11814,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The event is CANCELLED.",
             "content": {
@@ -11629,6 +12317,49 @@
                 "example": {
                   "code": "ZONE_NOT_FOUND",
                   "message": "La zona no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -12484,6 +13215,49 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -14207,6 +14981,49 @@
                 "example": {
                   "code": "RESERVATION_NOT_FOUND",
                   "message": "La reserva no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -16596,6 +17413,49 @@
                       "message": "No tiene permisos para realizar esta acción"
                     }
                   }
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }

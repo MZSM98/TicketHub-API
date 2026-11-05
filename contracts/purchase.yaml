@@ -151,6 +151,8 @@ paths:
               example:
                 code: RESERVATION_NOT_FOUND
                 message: La reserva no existe
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: The reservation is already paid, or it was cancelled.
           content:

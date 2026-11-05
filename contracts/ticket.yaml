@@ -196,6 +196,8 @@ paths:
                   value:
                     code: FORBIDDEN
                     message: No tiene permisos para realizar esta acción
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: The ticket was already used, or it was cancelled ("Acceso Denegado").
           content:

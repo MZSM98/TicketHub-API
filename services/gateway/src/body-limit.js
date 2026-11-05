@@ -1,6 +1,8 @@
+import { lingeringClose } from './client-error.js';
+
 export const BODY_LIMIT_BYTES = 100 * 1024;
 
-const hasBody = (req) =>
+export const hasBody = (req) =>
   req.headers['transfer-encoding'] !== undefined ||
   (req.headers['content-length'] !== undefined && req.headers['content-length'] !== '0');
 
@@ -8,7 +10,6 @@ const isMultipart = (req) => /^multipart\/form-data/i.test(req.headers['content-
 
 const DRAIN_LIMIT_BYTES = 16 * 1024 * 1024;
 const DRAIN_TIMEOUT_MS = 2000;
-const CLOSE_GRACE_MS = 5000;
 
 function cutAfterResponse(req, res) {
   let drained = 0;
@@ -16,8 +17,7 @@ function cutAfterResponse(req, res) {
   const cut = () => {
     if (req.complete || closing) return;
     closing = true;
-    req.socket.end();
-    setTimeout(() => req.socket.destroy(), CLOSE_GRACE_MS).unref();
+    lingeringClose(req.socket);
   };
   req.on('data', (chunk) => {
     drained += chunk.length;

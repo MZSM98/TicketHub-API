@@ -149,6 +149,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/VenueNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
@@ -222,6 +224,8 @@ paths:
                   value:
                     code: VENUE_NOT_FOUND
                     message: El recinto no existe
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/InvalidEventState'
         '413':
@@ -295,6 +299,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: Transition not allowed, or the event has no zones yet.
           content:
@@ -420,6 +426,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/InvalidEventState'
         '413':
@@ -551,6 +559,8 @@ paths:
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
           $ref: './common.yaml#/components/responses/Forbidden'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
@@ -605,6 +615,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/VenueNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '413':
           $ref: './common.yaml#/components/responses/PayloadTooLarge'
     delete:
