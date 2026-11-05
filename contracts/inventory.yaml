@@ -175,6 +175,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/ZoneNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: The zone is GENERAL, or it already has reserved or sold seats.
           content:
@@ -254,6 +256,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/EventNotEditable'
         '413':
@@ -292,6 +296,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/ZoneNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: |
             `ZONE_TYPE_CHANGE` when `type` differs from the current one (details carry the current
@@ -434,6 +440,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: Lost the race for a seat, not enough capacity, or the buyer already has an active reservation.
           content:
