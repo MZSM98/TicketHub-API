@@ -62,4 +62,35 @@ describe('timeouts del gateway contra cuerpos y headers lentos', () => {
       `[headers lentos] 408 ${JSON.stringify(body)} a los ${result.elapsed} ms (límite 2 s)`,
     );
   });
+
+  test('una respuesta temprana con el cuerpo sin leer cierra la conexión y no manda un 408 después', async () => {
+    const head =
+      `PUT ${target.pathname}/events/1/poster HTTP/1.1\r\nHost: ${target.host}\r\n` +
+      'Authorization: Bearer token-invalido\r\n' +
+      'Content-Type: multipart/form-data; boundary=x\r\nContent-Length: 50000\r\n\r\n--x';
+    const { raw, elapsed } = await new Promise((resolve) => {
+      const started = Date.now();
+      const socket = net.connect(Number(target.port), target.hostname);
+      let raw = '';
+      const timer = setInterval(() => socket.write('x'), 500);
+      const limit = setTimeout(() => socket.destroy(), 9000);
+      socket.on('connect', () => socket.write(head));
+      socket.on('data', (chunk) => (raw += chunk));
+      socket.on('error', () => null);
+      socket.on('close', () => {
+        clearInterval(timer);
+        clearTimeout(limit);
+        resolve({ raw, elapsed: Date.now() - started });
+      });
+    });
+    const statusLines = raw.match(/HTTP\/1\.1 \d{3}[^\r]*/g) ?? [];
+    assert.deepEqual(
+      statusLines,
+      ['HTTP/1.1 401 Unauthorized'],
+      `respuestas: ${JSON.stringify(statusLines)}`,
+    );
+    assert.match(raw, /^connection: close$/im);
+    assert.ok(elapsed < 9000, `la conexión siguió abierta ${elapsed} ms`);
+    console.log(`[respuesta temprana] ${JSON.stringify(statusLines)} y cierre a los ${elapsed} ms`);
+  });
 });
