@@ -17,7 +17,10 @@ const requestTimeoutResponse = () =>
   'Connection: close\r\n\r\n' +
   REQUEST_TIMEOUT_BODY;
 
-function lingeringClose(socket) {
+const CLOSING = Symbol('closing');
+
+export function lingeringClose(socket) {
+  socket[CLOSING] = true;
   socket.on('data', () => {});
   socket.on('error', () => {});
   socket.resume();
@@ -26,7 +29,7 @@ function lingeringClose(socket) {
 }
 
 export function onClientError(err, socket) {
-  const answered = socket._httpMessage?.headersSent === true;
+  const answered = socket[CLOSING] === true || socket._httpMessage?.headersSent === true;
   if (!socket.writable || answered) return socket.destroy();
   if (err.code === 'ERR_HTTP_REQUEST_TIMEOUT') {
     socket.write(requestTimeoutResponse());
@@ -34,4 +37,12 @@ export function onClientError(err, socket) {
   }
   socket.write(NODE_DEFAULTS[err.code] ?? BAD_REQUEST);
   socket.destroy();
+}
+
+export function closeAfterResponse(req, res) {
+  const { socket } = req;
+  socket[CLOSING] = true;
+  res.setHeader('Connection', 'close');
+  socket.destroySoon = () => lingeringClose(socket);
+  req.resume();
 }
