@@ -40,7 +40,8 @@ paths:
           description: |
             The gateway is up, so the response is always 200, even when a service is down.
             `status` is UP when every service is UP and DEGRADED when at least one service is DOWN.
-            Each service reports UP or DOWN in `services`.
+            Each service reports UP or DOWN in `services`. A service is DOWN when its process does not answer,
+            or when its database (MySQL) or its storage (MinIO) fails.
           content:
             application/json:
               schema:

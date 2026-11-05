@@ -23,7 +23,7 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "The gateway is up, so the response is always 200, even when a service is down.\n`status` is UP when every service is UP and DEGRADED when at least one service is DOWN.\nEach service reports UP or DOWN in `services`.\n",
+            "description": "The gateway is up, so the response is always 200, even when a service is down.\n`status` is UP when every service is UP and DEGRADED when at least one service is DOWN.\nEach service reports UP or DOWN in `services`. A service is DOWN when its process does not answer,\nor when its database (MySQL) or its storage (MinIO) fails.\n",
             "content": {
               "application/json": {
                 "schema": {
