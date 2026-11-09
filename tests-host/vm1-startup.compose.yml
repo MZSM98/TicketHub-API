@@ -1,0 +1,28 @@
+services:
+  vm2-mysql:
+    extends: { file: ../vm2/docker-compose.yml, service: mysql }
+    ports: !reset []
+    volumes: !override
+      - ../../db/init:/docker-entrypoint-initdb.d:ro
+    networks: !override
+      tickethub:
+        ipv4_address: 172.31.56.11
+    profiles: [vm2]
+
+  minio:
+    ports: !reset []
+
+  mailpit:
+    ports: !reset []
+
+  catalog-service:
+    ports: !reset []
+
+  gateway:
+    ports: !reset []
+
+networks:
+  tickethub:
+    ipam:
+      config:
+        - subnet: 172.31.56.0/24
