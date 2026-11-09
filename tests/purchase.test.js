@@ -133,7 +133,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     );
     s.buyers = [];
     s.buyerIds = [];
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 25; i++) {
       const account = { name: `Comprador ${i}`, email: email(`pur-${i}`), password: 'S3gura!2026' };
       s.buyerIds.push((await expectContract('POST', '/auth/register', 201, { body: account })).id);
       s.buyers.push((await login(account.email, account.password)).accessToken);
@@ -924,6 +924,30 @@ describe('PurchaseService (purchase.yaml)', () => {
       [keyOf(reservation.id, 1), keyOf(reservation.id, 2)],
     );
     fakes.stripe.intents.delete(foreign.id);
+  });
+
+  test('un intento PENDING creado con otro PAYMENT_NAMESPACE se repite con su llave y su deployment', async () => {
+    const other = process.env.PAYMENT_NAMESPACE_SHORTCLAIM;
+    assert.notEqual(other, NS);
+    const token = s.buyers[24];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    fakes.stripe.mode = 'down';
+    try {
+      await pay(token, reservation.id, 'pm_card_visa', 503, PURCHASE_SHORTCLAIM);
+    } finally {
+      fakes.stripe.mode = 'normal';
+    }
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.status, 'PAID');
+    const requests = intentRequestsOf(reservation.id);
+    const otherKey = `tickethub-${other}-reservation-${reservation.id}-attempt-1`;
+    assert.ok(requests.length >= 2);
+    assert.deepEqual(new Set(requests.map((r) => r.idempotencyKey)), new Set([otherKey]));
+    assert.deepEqual(
+      new Set(requests.map((r) => r.params['metadata[deployment]'])),
+      new Set([other]),
+    );
+    assert.equal(netChargesOf(reservation.id).length, 1);
   });
 
   test('reclamo vencido: la escritura del proceso que lo perdió se rechaza y el barrido deja un solo cobro', async () => {
