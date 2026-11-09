@@ -2,6 +2,7 @@ import { query, transaction } from '@tickethub/common/db';
 import { HttpError } from '@tickethub/common/http';
 import { config } from './config.js';
 import { CURRENCY } from './zones.js';
+import { insertUnlessActive } from './active-conflict.js';
 
 export const reservationNotFound = () =>
   new HttpError(404, 'RESERVATION_NOT_FOUND', 'La reserva no existe');
@@ -233,19 +234,19 @@ const itemNotValid = (index, field) =>
 const ACTIVE_CONFLICT_ROUNDS = 3;
 
 async function insertOrReportActive(userId, insert) {
-  for (let round = 1; round <= ACTIVE_CONFLICT_ROUNDS; round++) {
-    try {
-      return await insert();
-    } catch (err) {
-      if (err?.errno !== 1062) throw err;
-      const activeId = await activeReservationIdOf(userId);
-      if (activeId !== null) throw activeReservationExists(activeId);
-    }
-  }
-  console.error(
-    `La reserva activa del usuario ${userId} desapareció ${ACTIVE_CONFLICT_ROUNDS} veces seguidas tras el conflicto de unicidad`,
+  const result = await insertUnlessActive(
+    insert,
+    () => activeReservationIdOf(userId),
+    ACTIVE_CONFLICT_ROUNDS,
   );
-  throw reservationFailed();
+  if (result.activeId !== undefined) throw activeReservationExists(result.activeId);
+  if (result.exhausted) {
+    console.error(
+      `La reserva activa del usuario ${userId} desapareció ${ACTIVE_CONFLICT_ROUNDS} veces seguidas tras el conflicto de unicidad`,
+    );
+    throw reservationFailed();
+  }
+  return result.id;
 }
 
 export async function createReservation(userId, eventId, items) {
