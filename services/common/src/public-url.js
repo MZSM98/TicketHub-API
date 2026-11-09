@@ -19,12 +19,33 @@ export function parseHost(value) {
   return { host: value.toLowerCase(), hostname: match[1].toLowerCase() };
 }
 
+const MAPPED_IPV4 = new BlockList();
+MAPPED_IPV4.addSubnet('::ffff:0:0', 96, 'ipv6');
+
+export const isMappedIpv4 = (address) => isIP(address) === 6 && MAPPED_IPV4.check(address, 'ipv6');
+
+function overlapsMappedIpv4(address, prefix) {
+  if (isMappedIpv4(address)) return true;
+  const range = new BlockList();
+  range.addSubnet(address, prefix, 'ipv6');
+  return range.check('::ffff:0:0', 'ipv6');
+}
+
 export function parseCidr(entry) {
-  const match = /^([^/]+)\/(\d{1,3})$/.exec(entry);
+  const match = /^([^/]+)\/(0|[1-9]\d{0,2})$/.exec(entry);
   const family = match ? isIP(match[1]) : 0;
   const prefix = match ? Number(match[2]) : NaN;
   if (!family || prefix > (family === 4 ? 32 : 128)) return null;
+  if (family === 6 && overlapsMappedIpv4(match[1], prefix)) return null;
   return { address: match[1], prefix, type: family === 4 ? 'ipv4' : 'ipv6' };
+}
+
+const BRACKETED_IPV6 = /^\[([0-9a-f:.]+)\]$/;
+
+function validName(entry) {
+  const bracketed = BRACKETED_IPV6.exec(entry);
+  if (bracketed) return isIP(bracketed[1]) === 6 && !isMappedIpv4(bracketed[1]);
+  return !entry.includes(':');
 }
 
 export function parseAllowedHosts(value) {
@@ -34,6 +55,9 @@ export function parseAllowedHosts(value) {
   for (const entry of (value ?? '').split(',').map((host) => host.trim().toLowerCase())) {
     if (!entry) continue;
     if (!entry.includes('/')) {
+      if (!validName(entry)) {
+        throw new Error(`PUBLIC_HOSTS_ALLOWED tiene una entrada inválida: ${entry}`);
+      }
       names.push(entry);
       continue;
     }
@@ -52,7 +76,8 @@ function isAllowed(hostname, allowed) {
   if (allowed.names.includes(hostname)) return true;
   const ip = hostname.replace(/^\[|\]$/g, '');
   const family = isIP(ip);
-  return family !== 0 && allowed.ranges.check(ip, family === 4 ? 'ipv4' : 'ipv6');
+  if (family === 0 || isMappedIpv4(ip)) return false;
+  return allowed.ranges.check(ip, family === 4 ? 'ipv4' : 'ipv6');
 }
 
 function sameSecret(sent, expected) {

@@ -6,7 +6,7 @@ import { forwardBody, hasBody, limitBody } from './body-limit.js';
 import { closeAfterResponse, onClientError } from './client-error.js';
 import { authMode, resolveService } from './routes.js';
 import { rewriteForwarded } from './forwarded.js';
-import { parseTrustedProxies } from './trust.js';
+import { parseTrustProxyHost, parseTrustedProxies } from './trust.js';
 import { checkJwtSecret, checkSecret } from './secret.js';
 import { serverTimeouts } from './timeouts.js';
 
@@ -16,6 +16,7 @@ const jwtSecret = checkJwtSecret(process.env.JWT_SECRET);
 const forwardSecret = checkSecret('GATEWAY_FORWARD_SECRET', process.env.GATEWAY_FORWARD_SECRET);
 const timeouts = serverTimeouts(process.env);
 const isTrustedProxy = parseTrustedProxies(process.env.TRUST_PROXY);
+const trustProxyHost = parseTrustProxyHost(process.env.TRUST_PROXY_HOST);
 const SERVICES_WITH_FORWARD_SECRET = new Set(['catalog']);
 const PROXY_TIMEOUT_MS = 15_000;
 const proxyAgent = new http.Agent({ keepAlive: true, timeout: PROXY_TIMEOUT_MS });
@@ -105,6 +106,7 @@ app.use(API_PREFIX, (req, res, next) => {
     secret: forwardSecret,
     sendSecret: SERVICES_WITH_FORWARD_SECRET.has(service),
     isTrustedProxy,
+    trustHost: trustProxyHost,
   });
   return limitBody(req, res, () => proxies[service](req, res, next));
 });

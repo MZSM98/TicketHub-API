@@ -220,6 +220,7 @@ services:
       GATEWAY_REQUEST_TIMEOUT_SECONDS: ${GATEWAY_REQUEST_TIMEOUT_SECONDS:-60}
       GATEWAY_HEADERS_TIMEOUT_SECONDS: ${GATEWAY_HEADERS_TIMEOUT_SECONDS:-15}
       TRUST_PROXY: ${TRUST_PROXY:-}
+      TRUST_PROXY_HOST: ${TRUST_PROXY_HOST:-true}
     ports:
       - '${GATEWAY_HOST_PORT}:8080'
     # Sin depends_on de salud: si un servicio cae, el gateway sigue y responde 503 solo en sus rutas.
@@ -253,6 +254,7 @@ services:
       - ./mock:/app/mock:ro
       - ./services/gateway/src:/app/services/gateway/src:ro
       - ./services/common/src:/app/services/common/src:ro
+      - ./services/inventory/src/active-conflict.js:/app/services/inventory/src/active-conflict.js:ro
       - ./services/purchase/src/config.js:/app/services/purchase/src/config.js:ro
       - ./services/purchase/src/schema.js:/app/services/purchase/src/schema.js:ro
       - ./services/inventory/src/config.js:/app/services/inventory/src/config.js:ro
