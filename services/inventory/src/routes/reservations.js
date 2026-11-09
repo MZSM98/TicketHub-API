@@ -31,7 +31,12 @@ function parseItems(raw) {
   const fields = [];
   const seen = new Set();
   raw.forEach((item, i) => {
-    const keys = item && typeof item === 'object' ? Object.keys(item).sort().join(',') : '';
+    const keys =
+      item && typeof item === 'object'
+        ? Object.keys(item)
+            .sort((a, b) => a.localeCompare(b))
+            .join(',')
+        : '';
     let key;
     if (keys === 'seatId' && isId(item.seatId)) key = `seat:${item.seatId}`;
     else if (
