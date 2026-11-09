@@ -27,6 +27,7 @@ services:
     environment:
       STRIPE_API_BASE: http://tests:4100
       STRIPE_SECRET_KEY: sk_test_fake_tickethub
+      PAYMENT_NAMESPACE: tickethub-pruebas
       STRIPE_TIMEOUT_MS: '1500'
       TICKET_SERVICE_URL: http://tests:4100
       TICKET_RETRY_SECONDS: '0'
@@ -40,6 +41,7 @@ services:
     environment:
       STRIPE_API_BASE: http://tests:4100
       STRIPE_SECRET_KEY: sk_test_fake_tickethub
+      PAYMENT_NAMESPACE: tickethub-pruebas
       INVENTORY_SERVICE_URL: http://inventory-down.invalid:3003
       CATALOG_SERVICE_URL: http://catalog-down.invalid:3002
       TICKET_SERVICE_URL: http://tests:4100
@@ -55,6 +57,7 @@ services:
     environment:
       STRIPE_API_BASE: http://tests:4100
       STRIPE_SECRET_KEY: sk_test_fake_tickethub
+      PAYMENT_NAMESPACE: tickethub-pruebas-b
       STRIPE_TIMEOUT_MS: '1500'
       INTERNAL_TIMEOUT_MS: '1500'
       TICKET_SERVICE_URL: http://tests:4100
@@ -95,6 +98,8 @@ services:
     environment:
       GATEWAY_DEGRADED_URL: http://gateway-degraded:8080/api/v1
       GATEWAY_TRUSTED_URL: http://gateway-trusted:8080/api/v1
+      PAYMENT_NAMESPACE: tickethub-pruebas
+      PAYMENT_NAMESPACE_SHORTCLAIM: tickethub-pruebas-b
       INVENTORY_URL: http://inventory-service:3003/api/v1
       INVENTORY_SWEEP_URL: http://inventory-sweep:3003/api/v1
       INVENTORY_LAZY_URL: http://inventory-lazy:3003/api/v1

@@ -11,6 +11,7 @@ import {
   providerName,
   refund,
 } from './payments/index.js';
+import { buildAttemptKey, keyNamespace } from './attempt-key.js';
 import { revokeSale } from './services.js';
 
 export class ClaimLostError extends Error {
@@ -38,7 +39,12 @@ async function updateAttempt(claim, attemptId, assignments, params, conn) {
 }
 
 export const attemptKey = (reservationId, attempt) =>
-  `tickethub-reservation-${reservationId}-attempt-${attempt}`;
+  buildAttemptKey(config.paymentNamespace, reservationId, attempt);
+
+const deploymentOf = (attempt) => {
+  const namespace = keyNamespace(attempt);
+  return namespace ? { deployment: namespace } : {};
+};
 
 export async function claimPurchase(purchaseId) {
   const token = randomUUID();
@@ -128,12 +134,13 @@ export async function sendAuthorization(claim, attempt, userId) {
         reservation_id: attempt.reservation_id,
         attempt: attempt.attempt,
         user_id: userId,
+        ...deploymentOf(attempt),
       },
     });
   } catch (err) {
     if (err instanceof PaymentIdempotencyError) {
       console.error(
-        `Intento ${attempt.idempotency_key} no se reintentará; se busca y cancela su autorización: ${err.message}`,
+        `Intento ${attempt.idempotency_key} no se reintentará; si su llave trae PAYMENT_NAMESPACE se busca y cancela su autorización, y si no queda para revisión manual: ${err.message}`,
       );
       await setStatus(claim, attempt, 'CANCEL_PENDING', err.message.slice(0, 255));
       await undoAttempt(claim, {
@@ -336,8 +343,19 @@ async function setStatus(claim, attempt, status, error = null) {
 const RECOVERY_WINDOW_SECONDS = 300;
 
 async function recoverReference(claim, attempt) {
+  const deployment = keyNamespace(attempt);
+  if (!deployment) {
+    console.error(
+      `ALERTA: el intento ${attempt.idempotency_key} (compra ${attempt.purchase_id}, reserva ${attempt.reservation_id}) tiene una llave sin PAYMENT_NAMESPACE; no se busca ni se cancela su autorización en Stripe porque podría ser de otro despliegue; requiere revisión manual`,
+    );
+    return null;
+  }
   const found = await findIntent({
-    metadata: { reservation_id: attempt.reservation_id, attempt: attempt.attempt },
+    metadata: {
+      reservation_id: attempt.reservation_id,
+      attempt: attempt.attempt,
+      deployment,
+    },
     createdAfter: Math.floor(attempt.created_at.getTime() / 1000) - RECOVERY_WINDOW_SECONDS,
   });
   if (!found) return null;

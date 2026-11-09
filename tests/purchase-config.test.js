@@ -7,7 +7,14 @@ const loadConfig = (env) =>
     process.execPath,
     ['--input-type=module', '-e', "import '/app/services/purchase/src/config.js'"],
     {
-      env: { PATH: process.env.PATH, INTERNAL_TOKEN: 'x', ...env },
+      env: Object.fromEntries(
+        Object.entries({
+          PATH: process.env.PATH,
+          INTERNAL_TOKEN: 'x',
+          PAYMENT_NAMESPACE: 'pruebas',
+          ...env,
+        }).filter(([, value]) => value !== undefined),
+      ),
       encoding: 'utf8',
     },
   );
@@ -38,5 +45,26 @@ describe('PAYMENT_CLAIM_SECONDS', () => {
 
   test('sin valor se calcula a partir de los timeouts', () => {
     assert.equal(loadConfig({}).status, 0);
+  });
+});
+
+describe('PAYMENT_NAMESPACE', () => {
+  test('sin valor impide arrancar', () => {
+    for (const value of [undefined, '']) {
+      const result = loadConfig({ PAYMENT_NAMESPACE: value });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Falta la variable de entorno PAYMENT_NAMESPACE/);
+    }
+  });
+
+  test('solo a-z, 0-9 y guion, de 1 a 40 caracteres', () => {
+    for (const value of ['Prod', 'con espacio', 'a_b', 'ñ', 'x'.repeat(41)]) {
+      const result = loadConfig({ PAYMENT_NAMESPACE: value });
+      assert.notEqual(result.status, 0, value);
+      assert.match(result.stderr, /PAYMENT_NAMESPACE debe tener de 1 a 40 caracteres/, value);
+    }
+    for (const value of ['a', 'tickethub-pruebas', '0f3a9c', 'x'.repeat(40)]) {
+      assert.equal(loadConfig({ PAYMENT_NAMESPACE: value }).status, 0, value);
+    }
   });
 });

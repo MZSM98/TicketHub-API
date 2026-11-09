@@ -20,6 +20,8 @@ import {
 } from './helpers.js';
 
 const internal = { 'x-internal-token': INTERNAL_TOKEN };
+const NS = process.env.PAYMENT_NAMESPACE;
+const keyOf = (reservationId, n) => `tickethub-${NS}-reservation-${reservationId}-attempt-${n}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const inDays = (days) =>
   new Date(Date.now() + days * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -131,7 +133,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     );
     s.buyers = [];
     s.buyerIds = [];
-    for (let i = 0; i < 23; i++) {
+    for (let i = 0; i < 25; i++) {
       const account = { name: `Comprador ${i}`, email: email(`pur-${i}`), password: 'S3gura!2026' };
       s.buyerIds.push((await expectContract('POST', '/auth/register', 201, { body: account })).id);
       s.buyers.push((await login(account.email, account.password)).accessToken);
@@ -202,10 +204,9 @@ describe('PurchaseService (purchase.yaml)', () => {
     const [request] = intentRequestsOf(reservation.id);
     assert.equal(request.authorization, `Bearer ${STRIPE_KEY}`);
     assert.equal(request.contentType, 'application/x-www-form-urlencoded');
-    assert.match(
-      request.idempotencyKey,
-      new RegExp(`^tickethub-reservation-${reservation.id}-attempt-1$`),
-    );
+    assert.match(NS, /^[a-z0-9-]{1,40}$/);
+    assert.equal(request.idempotencyKey, keyOf(reservation.id, 1));
+    assert.equal(request.params['metadata[deployment]'], NS);
     assert.deepEqual(
       [
         request.params.amount,
@@ -293,12 +294,10 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.equal((await internalReservation(reservation.id)).status, 'ACTIVE');
     const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
     assert.deepEqual([ok.purchase.status, ok.purchase.failedAttempts], ['PAID', 2]);
-    const keys = intentRequestsOf(reservation.id).map((r) =>
-      r.idempotencyKey.split('-').slice(0, 5).join('-'),
-    );
+    const keys = intentRequestsOf(reservation.id).map((r) => r.idempotencyKey);
     assert.deepEqual(
       keys,
-      [1, 2, 3].map((n) => `tickethub-reservation-${reservation.id}-attempt-${n}`),
+      [1, 2, 3].map((n) => keyOf(reservation.id, n)),
     );
     s.paid.push(ok.purchase);
   });
@@ -856,7 +855,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     const failed = await pay(token, reservation.id, 'pm_card_visa', 502);
     assert.equal(failed.code, 'PAYMENT_GATEWAY_ERROR');
     fakes.stripe.idempotencyErrorFor.delete(reservation.id);
-    const key1 = `tickethub-reservation-${reservation.id}-attempt-1`;
+    const key1 = keyOf(reservation.id, 1);
     await sleep(6000);
     assert.equal(
       intentRequestsOf(reservation.id).filter((r) => r.idempotencyKey === key1).length,
@@ -867,7 +866,7 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.equal(ok.purchase.failedAttempts, 0);
     assert.deepEqual(
       intentRequestsOf(reservation.id).map((r) => r.idempotencyKey),
-      [key1, `tickethub-reservation-${reservation.id}-attempt-2`],
+      [key1, keyOf(reservation.id, 2)],
     );
     assert.equal(netChargesOf(reservation.id).length, 1);
   });
@@ -890,6 +889,65 @@ describe('PurchaseService (purchase.yaml)', () => {
     assert.equal(netChargesOf(reservation.id).length, 1);
     assert.equal(orphansOf(reservation.id).length, 0);
     console.log(`[idempotency_error recuperado] ${orphan.id} cancelada; huérfanas=0`);
+  });
+
+  test('400 idempotency_error: un PaymentIntent de otro despliegue con los mismos ids no se toca', async () => {
+    const token = s.buyers[23];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    const foreign = {
+      id: `pi_fake_otro_${reservation.id}`,
+      status: 'requires_capture',
+      created: Math.floor(Date.now() / 1000),
+      metadata: {
+        reservation_id: String(reservation.id),
+        attempt: '1',
+        deployment: 'otro-despliegue',
+      },
+    };
+    fakes.stripe.intents.set(foreign.id, foreign);
+    fakes.stripe.idempotencyErrorFor.add(reservation.id);
+    const listsBefore = fakes.stripe.lists ?? 0;
+    try {
+      const failed = await pay(token, reservation.id, 'pm_card_visa', 502);
+      assert.equal(failed.code, 'PAYMENT_GATEWAY_ERROR');
+    } finally {
+      fakes.stripe.idempotencyErrorFor.delete(reservation.id);
+    }
+    assert.ok((fakes.stripe.lists ?? 0) > listsBefore, 'se buscó el PaymentIntent');
+    assert.equal(foreign.status, 'requires_capture', 'el de otro despliegue sigue intacto');
+    assert.equal(requestsTo('cancel', foreign), 0);
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.failedAttempts, 0);
+    assert.notEqual(ok.purchase.paymentReference, foreign.id);
+    assert.deepEqual(
+      intentRequestsOf(reservation.id).map((r) => r.idempotencyKey),
+      [keyOf(reservation.id, 1), keyOf(reservation.id, 2)],
+    );
+    fakes.stripe.intents.delete(foreign.id);
+  });
+
+  test('un intento PENDING creado con otro PAYMENT_NAMESPACE se repite con su llave y su deployment', async () => {
+    const other = process.env.PAYMENT_NAMESPACE_SHORTCLAIM;
+    assert.notEqual(other, NS);
+    const token = s.buyers[24];
+    const reservation = await reserve(token, [{ zoneId: s.general.id, quantity: 1 }]);
+    fakes.stripe.mode = 'down';
+    try {
+      await pay(token, reservation.id, 'pm_card_visa', 503, PURCHASE_SHORTCLAIM);
+    } finally {
+      fakes.stripe.mode = 'normal';
+    }
+    const ok = await pay(token, reservation.id, 'pm_card_visa', 201);
+    assert.equal(ok.purchase.status, 'PAID');
+    const requests = intentRequestsOf(reservation.id);
+    const otherKey = `tickethub-${other}-reservation-${reservation.id}-attempt-1`;
+    assert.ok(requests.length >= 2);
+    assert.deepEqual(new Set(requests.map((r) => r.idempotencyKey)), new Set([otherKey]));
+    assert.deepEqual(
+      new Set(requests.map((r) => r.params['metadata[deployment]'])),
+      new Set([other]),
+    );
+    assert.equal(netChargesOf(reservation.id).length, 1);
   });
 
   test('reclamo vencido: la escritura del proceso que lo perdió se rechaza y el barrido deja un solo cobro', async () => {

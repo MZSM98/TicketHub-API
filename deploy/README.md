@@ -21,6 +21,8 @@ El gateway se publica en `0.0.0.0:8080` dentro de vm1 porque el `forwarded_port`
 
   `vagrant provision vm2` también funciona, pero reinicia Docker y reconstruye todo.
 
+- `PAYMENT_NAMESPACE` es obligatorio: si falta o está vacío, purchase no arranca. `gen-env.sh` lo genera, pero un `.env` creado antes de este cambio (como el que reutiliza Vagrant en `/vagrant/.env`) no lo trae. Agrégalo a mano con un valor propio de este despliegue (de 1 a 40 caracteres: a-z, 0-9 y guion), por ejemplo `PAYMENT_NAMESPACE=` seguido de la salida de `openssl rand -hex 8`, y recarga purchase con el comando de arriba.
+
 ## Administrador
 
 `vagrant up` crea el ADMIN con `ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`. `gen-env.sh` genera esa contraseña al azar; consúltala en el `.env` (no se imprime en ningún log). No es `change-me-admin-password` de `.env.example`, que es la que suponen el tutorial del README principal y una colección de Postman configurada con ese ejemplo (el repositorio no incluye colección); en Postman pon el valor del `.env`. Si el admin ya existe, el aprovisionamiento lo indica y sigue; cualquier otro fallo detiene el aprovisionamiento.
