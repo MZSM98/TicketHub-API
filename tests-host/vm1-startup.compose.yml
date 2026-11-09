@@ -6,7 +6,7 @@ services:
       - ../../db/init:/docker-entrypoint-initdb.d:ro
     networks: !override
       tickethub:
-        ipv4_address: 172.31.56.11
+        ipv4_address: ${VM2_IP}
     profiles: [vm2]
 
   minio:
@@ -25,4 +25,4 @@ networks:
   tickethub:
     ipam:
       config:
-        - subnet: 172.31.56.0/24
+        - subnet: ${VM1_TEST_SUBNET}
