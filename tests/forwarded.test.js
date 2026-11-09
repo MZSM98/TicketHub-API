@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { rewriteForwarded } from '../services/gateway/src/forwarded.js';
-import { parseTrustedProxies } from '../services/gateway/src/trust.js';
+import { parseTrustProxyHost, parseTrustedProxies } from '../services/gateway/src/trust.js';
 
 const SECRET = 's'.repeat(32);
 
-function rewrite(peer, headers, { trust = '', sendSecret = true, encrypted = false } = {}) {
+function rewrite(
+  peer,
+  headers,
+  { trust = '', sendSecret = true, encrypted = false, trustHost = true } = {},
+) {
   const req = { headers: { ...headers }, socket: { remoteAddress: peer, encrypted } };
-  rewriteForwarded(req, { secret: SECRET, sendSecret, isTrustedProxy: parseTrustedProxies(trust) });
+  rewriteForwarded(req, {
+    secret: SECRET,
+    sendSecret,
+    isTrustedProxy: parseTrustedProxies(trust),
+    trustHost,
+  });
   return req.headers;
 }
 
@@ -131,5 +140,31 @@ describe('TRUST_PROXY y cabeceras reenviadas del gateway', () => {
     assert.equal(trusted('::ffff:172.30.0.10'), true, 'el par IPv4 llega mapeado en IPv6');
     assert.equal(trusted('fd00::5'), true);
     assert.equal(trusted('172.30.0.11'), false);
+  });
+
+  test('con TRUST_PROXY_HOST=false (cloudflared) el X-Forwarded-Host del cliente no llega al servicio', () => {
+    for (const forwardedHost of ['evil.example', 'abc.trycloudflare.com, evil.example']) {
+      const headers = rewrite(
+        '172.30.250.10',
+        {
+          host: 'abc.trycloudflare.com',
+          'x-forwarded-proto': 'https',
+          'x-forwarded-host': forwardedHost,
+        },
+        { trust: '172.30.250.10', trustHost: false },
+      );
+      assert.equal(headers['x-forwarded-proto'], 'https', forwardedHost);
+      assert.equal(headers['x-forwarded-host'], 'abc.trycloudflare.com', forwardedHost);
+    }
+  });
+
+  test('TRUST_PROXY_HOST solo acepta true o false', () => {
+    assert.equal(parseTrustProxyHost(undefined), true);
+    assert.equal(parseTrustProxyHost(''), true);
+    assert.equal(parseTrustProxyHost('true'), true);
+    assert.equal(parseTrustProxyHost('false'), false);
+    for (const bad of ['0', 'no', 'FALSE', ' false']) {
+      assert.throws(() => parseTrustProxyHost(bad), /TRUST_PROXY_HOST debe ser true o false/, bad);
+    }
   });
 });
