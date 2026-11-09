@@ -15,6 +15,12 @@ function overlapsMappedIpv4(address, prefix) {
   return range.check('::ffff:0:0', 'ipv6');
 }
 
+export function parseTrustProxyHost(value) {
+  if (value === undefined || value === '' || value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`TRUST_PROXY_HOST debe ser true o false: ${value}`);
+}
+
 export function parseTrustedProxies(value) {
   const list = new BlockList();
   let count = 0;

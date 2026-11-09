@@ -17,17 +17,17 @@ export function validHost(value) {
 const lastValue = (header) =>
   typeof header === 'string' ? (header.split(',').pop() ?? '').trim() : '';
 
-function fromProxy(req) {
+function fromProxy(req, trustHost) {
   const proto = lastValue(req.headers['x-forwarded-proto']).toLowerCase();
-  const host = lastValue(req.headers['x-forwarded-host']);
+  const host = trustHost ? lastValue(req.headers['x-forwarded-host']) : '';
   return {
     proto: proto === 'http' || proto === 'https' ? proto : null,
     host: validHost(host) ? host : null,
   };
 }
 
-export function rewriteForwarded(req, { secret, sendSecret, isTrustedProxy }) {
-  const proxy = isTrustedProxy(req.socket.remoteAddress) ? fromProxy(req) : {};
+export function rewriteForwarded(req, { secret, sendSecret, isTrustedProxy, trustHost = true }) {
+  const proxy = isTrustedProxy(req.socket.remoteAddress) ? fromProxy(req, trustHost) : {};
   for (const name of Object.keys(req.headers)) {
     if (CLIENT_HEADERS.test(name)) delete req.headers[name];
   }
