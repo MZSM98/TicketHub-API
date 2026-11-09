@@ -130,8 +130,8 @@ services:
     ports:
       - '${GATEWAY_BIND:-0.0.0.0}:${GATEWAY_HOST_PORT:-8080}:8080'
     depends_on:
-      identity-service: { condition: service_healthy }
-      catalog-service: { condition: service_healthy }
+      identity-service: { condition: service_started }
+      catalog-service: { condition: service_started }
 
 networks:
   tickethub:
