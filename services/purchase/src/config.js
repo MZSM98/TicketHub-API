@@ -10,6 +10,15 @@ function positiveNumber(name, fallback) {
   return value;
 }
 
+function paymentNamespace(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`Falta la variable de entorno ${name}`);
+  if (!/^[a-z0-9-]{1,40}$/.test(value)) {
+    throw new Error(`${name} debe tener de 1 a 40 caracteres entre a-z, 0-9 y guion`);
+  }
+  return value;
+}
+
 function atLeastOne(name, fallback) {
   const value = Number(process.env[name] ?? fallback);
   if (!Number.isInteger(value) || value < 1) {
@@ -23,6 +32,7 @@ export const config = {
   internalToken: required('INTERNAL_TOKEN'),
   internalTimeoutMs: positiveNumber('INTERNAL_TIMEOUT_MS', 3000),
   paymentProvider: process.env.PAYMENT_PROVIDER ?? 'stripe',
+  paymentNamespace: paymentNamespace('PAYMENT_NAMESPACE'),
   paymentMaxAttempts: atLeastOne('PAYMENT_MAX_ATTEMPTS', 3),
   ticketRetryMs: positiveNumber('TICKET_RETRY_SECONDS', 30) * 1000,
   ticketRetryBackoffSeconds: positiveNumber('TICKET_RETRY_BACKOFF_SECONDS', 30),

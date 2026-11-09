@@ -38,7 +38,12 @@ async function updateAttempt(claim, attemptId, assignments, params, conn) {
 }
 
 export const attemptKey = (reservationId, attempt) =>
-  `tickethub-reservation-${reservationId}-attempt-${attempt}`;
+  `tickethub-${config.paymentNamespace}-reservation-${reservationId}-attempt-${attempt}`;
+
+const LEGACY_KEY = /^tickethub-reservation-\d+-attempt-\d+$/;
+
+const deploymentOf = (attempt) =>
+  LEGACY_KEY.test(attempt.idempotency_key) ? {} : { deployment: config.paymentNamespace };
 
 export async function claimPurchase(purchaseId) {
   const token = randomUUID();
@@ -128,6 +133,7 @@ export async function sendAuthorization(claim, attempt, userId) {
         reservation_id: attempt.reservation_id,
         attempt: attempt.attempt,
         user_id: userId,
+        ...deploymentOf(attempt),
       },
     });
   } catch (err) {
@@ -337,7 +343,11 @@ const RECOVERY_WINDOW_SECONDS = 300;
 
 async function recoverReference(claim, attempt) {
   const found = await findIntent({
-    metadata: { reservation_id: attempt.reservation_id, attempt: attempt.attempt },
+    metadata: {
+      reservation_id: attempt.reservation_id,
+      attempt: attempt.attempt,
+      ...deploymentOf(attempt),
+    },
     createdAfter: Math.floor(attempt.created_at.getTime() / 1000) - RECOVERY_WINDOW_SECONDS,
   });
   if (!found) return null;
