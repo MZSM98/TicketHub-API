@@ -149,6 +149,10 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/VenueNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /events/{eventId}:
     parameters:
@@ -220,8 +224,12 @@ paths:
                   value:
                     code: VENUE_NOT_FOUND
                     message: El recinto no existe
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/InvalidEventState'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
     delete:
       tags: [Events]
       operationId: deleteEvent
@@ -291,6 +299,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: Transition not allowed, or the event has no zones yet.
           content:
@@ -309,6 +319,8 @@ paths:
                   value:
                     code: EVENT_HAS_NO_ZONES
                     message: Configure al menos una zona antes de publicar
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           description: InventoryService did not answer, so the zones could not be checked before publishing.
           content:
@@ -414,6 +426,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/InvalidEventState'
         '413':
@@ -545,6 +559,10 @@ paths:
           $ref: './common.yaml#/components/responses/Unauthorized'
         '403':
           $ref: './common.yaml#/components/responses/Forbidden'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /venues/{venueId}:
     parameters:
@@ -597,6 +615,10 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/VenueNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
     delete:
       tags: [Venues]
       operationId: deleteVenue

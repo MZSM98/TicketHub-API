@@ -297,6 +297,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The email already belongs to an account (including soft-deleted ones).",
             "content": {
@@ -336,6 +379,52 @@
                 "example": {
                   "code": "EMAIL_ALREADY_REGISTERED",
                   "message": "El correo ya está registrado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -708,6 +797,95 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -972,6 +1150,95 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "A downstream service is not reachable.",
             "content": {
@@ -1100,6 +1367,95 @@
                         "issue": "required"
                       }
                     ]
+                  }
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -1396,6 +1752,95 @@
                       "code": "UNAUTHORIZED",
                       "message": "Sesión no válida o expirada, inicie sesión de nuevo"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -2262,6 +2707,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The admin tried to suspend their own account.",
             "content": {
@@ -2301,6 +2789,52 @@
                 "example": {
                   "code": "CANNOT_MODIFY_SELF",
                   "message": "No puede cambiar el estado de su propia cuenta"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -2606,6 +3140,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The email already belongs to an account (including soft-deleted ones).",
             "content": {
@@ -2645,6 +3222,52 @@
                 "example": {
                   "code": "EMAIL_ALREADY_REGISTERED",
                   "message": "El correo ya está registrado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -3256,6 +3879,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The email already belongs to an account (including soft-deleted ones).",
             "content": {
@@ -3295,6 +3961,52 @@
                 "example": {
                   "code": "EMAIL_ALREADY_REGISTERED",
                   "message": "El correo ya está registrado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -4059,6 +4771,95 @@
                 }
               }
             }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4693,6 +5494,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The operation is not allowed in the event's current status.",
             "content": {
@@ -4734,6 +5578,52 @@
                   "message": "El evento no se puede modificar en su estado actual",
                   "details": {
                     "status": "CANCELLED"
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -5359,6 +6249,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Transition not allowed, or the event has no zones yet.",
             "content": {
@@ -5411,6 +6344,52 @@
                       "code": "EVENT_HAS_NO_ZONES",
                       "message": "Configure al menos una zona antes de publicar"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -5987,6 +6966,49 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -7042,6 +8064,95 @@
                 }
               }
             }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7525,6 +8636,95 @@
                 "example": {
                   "code": "VENUE_NOT_FOUND",
                   "message": "El recinto no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -9180,6 +10380,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Rows come in the order the organizer sent them when the seats were generated (not sorted by\n`rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.\n",
                   "required": [
                     "zoneId",
                     "eventId",
@@ -9219,6 +10420,7 @@
                     },
                     "rows": {
                       "type": "array",
+                      "description": "In the order the organizer defined them, not sorted by `rowLabel`.",
                       "items": {
                         "type": "object",
                         "required": [
@@ -9231,6 +10433,7 @@
                           },
                           "seats": {
                             "type": "array",
+                            "description": "Sorted by `seatNumber` ascending (1..seatCount).",
                             "items": {
                               "type": "object",
                               "required": [
@@ -9247,7 +10450,8 @@
                                 },
                                 "seatNumber": {
                                   "type": "integer",
-                                  "minimum": 1
+                                  "minimum": 1,
+                                  "description": "Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are\nnot modelled, so consecutive numbers in the same row are adjacent seats.\n"
                                 },
                                 "status": {
                                   "type": "string",
@@ -9536,6 +10740,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "description": "Rows come in the order the organizer sent them when the seats were generated (not sorted by\n`rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.\n",
                   "required": [
                     "zoneId",
                     "eventId",
@@ -9575,6 +10780,7 @@
                     },
                     "rows": {
                       "type": "array",
+                      "description": "In the order the organizer defined them, not sorted by `rowLabel`.",
                       "items": {
                         "type": "object",
                         "required": [
@@ -9587,6 +10793,7 @@
                           },
                           "seats": {
                             "type": "array",
+                            "description": "Sorted by `seatNumber` ascending (1..seatCount).",
                             "items": {
                               "type": "object",
                               "required": [
@@ -9603,7 +10810,8 @@
                                 },
                                 "seatNumber": {
                                   "type": "integer",
-                                  "minimum": 1
+                                  "minimum": 1,
+                                  "description": "Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are\nnot modelled, so consecutive numbers in the same row are adjacent seats.\n"
                                 },
                                 "status": {
                                   "type": "string",
@@ -9813,6 +11021,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The zone is GENERAL, or it already has reserved or sold seats.",
             "content": {
@@ -9861,6 +11112,52 @@
                       "code": "ZONE_HAS_SALES",
                       "message": "La zona ya tiene asientos reservados o vendidos"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -10517,6 +11814,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The event is CANCELLED.",
             "content": {
@@ -10556,6 +11896,52 @@
                 "example": {
                   "code": "INVALID_EVENT_STATE",
                   "message": "El evento no se puede modificar en su estado actual"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -10935,6 +12321,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "`ZONE_TYPE_CHANGE` when `type` differs from the current one (details carry the current\ntype), `CAPACITY_BELOW_COMMITTED` when `capacity` is below what is already reserved or\nsold, or `ZONE_HAS_SALES` when the capacity of a NUMBERED zone changes while it has\nreservations or sales (without them the seat layout is deleted and must be generated again).\n",
             "content": {
@@ -10998,6 +12427,52 @@
                       "code": "ZONE_HAS_SALES",
                       "message": "La zona ya tiene asientos reservados o vendidos"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }
@@ -11307,7 +12782,7 @@
         ],
         "operationId": "createReservation",
         "summary": "Reserve seats or general tickets (CU-06)",
-        "description": "**Role:** BUYER. All items must belong to `eventId`, which must be PUBLISHED and in the future.\nA buyer can have only one ACTIVE reservation at a time. Max `MAX_TICKETS_PER_RESERVATION`\ntickets (default 10). Each item is either `{ seatId }` (NUMBERED zone) or\n`{ zoneId, quantity }` (GENERAL zone).\n",
+        "description": "**Role:** BUYER. All items must belong to `eventId`, which must be PUBLISHED and in the future.\nA buyer can have only one ACTIVE reservation at a time. Max `MAX_TICKETS_PER_RESERVATION`\ntickets (default 10). The hard limit is 10: InventoryService refuses to start when\n`MAX_TICKETS_PER_RESERVATION` is not an integer between 1 and 10. Each item is either `{ seatId }` (NUMBERED zone) or\n`{ zoneId, quantity }` (GENERAL zone).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -11328,6 +12803,8 @@
                   "items": {
                     "type": "array",
                     "minItems": 1,
+                    "maxItems": 10,
+                    "description": "At most `MAX_TICKETS_PER_RESERVATION` (integer 1-10, default 10) items; never more than 10.",
                     "items": {
                       "oneOf": [
                         {
@@ -11413,6 +12890,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -11447,6 +12925,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -11529,6 +13014,7 @@
                   "userId": 101,
                   "eventId": 12,
                   "status": "ACTIVE",
+                  "purchaseId": null,
                   "createdAt": "2026-10-26T15:40:00Z",
                   "expiresAt": "2026-10-26T15:50:00Z",
                   "secondsRemaining": 600,
@@ -11729,6 +13215,49 @@
                 "example": {
                   "code": "EVENT_NOT_FOUND",
                   "message": "El evento no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -11938,6 +13467,52 @@
               }
             }
           },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected concurrency failure (CU-06 EX1), for example a deadlock after retries.",
             "content": {
@@ -12052,6 +13627,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -12086,6 +13662,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -12336,6 +13919,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -12370,6 +13954,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -12620,6 +14211,7 @@
                     "userId",
                     "eventId",
                     "status",
+                    "purchaseId",
                     "createdAt",
                     "expiresAt",
                     "secondsRemaining",
@@ -12654,6 +14246,13 @@
                         "CANCELLED",
                         "EXPIRED"
                       ]
+                    },
+                    "purchaseId": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1,
+                      "nullable": true,
+                      "description": "Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,\nEXPIRED and CANCELLED (including a sale undone after a rejected capture).\n"
                     },
                     "createdAt": {
                       "type": "string",
@@ -12964,7 +14563,7 @@
         ],
         "operationId": "processPurchase",
         "summary": "Pay an active reservation (CU-08)",
-        "description": "**Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never\nfrom the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.\n",
+        "description": "**Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never\nfrom the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.\n\n**Idempotency.** The server guarantees at most one charge per reservation; an\n`Idempotency-Key` header sent by the client is ignored. Simultaneous requests for the same\nreservation are processed one at a time. After a 503 `PAYMENT_GATEWAY_UNAVAILABLE` (for\nexample a provider timeout), a retry first resolves the earlier attempt with the provider:\nif that attempt was approved, the purchase is completed with it and the\n`paymentMethodToken` of the retry is not charged.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -13099,7 +14698,7 @@
                         "ISSUED",
                         "PENDING"
                       ],
-                      "description": "PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1)."
+                      "description": "PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).\nInternally the purchase moves to a FAILED issuance state once `TICKET_RETRY_MAX_ATTEMPTS`\nretries are exhausted (logged for manual review). The API does not expose FAILED:\n`ticketIssuance` only appears in this response, which always says ISSUED or PENDING,\nand `GET /purchases/me` and `GET /purchases/{purchaseId}` do not include it.\n"
                     },
                     "ticketIds": {
                       "type": "array",
@@ -13229,7 +14828,7 @@
             }
           },
           "402": {
-            "description": "The provider declined the charge (CU-08 FA1).",
+            "description": "The provider declined the charge or its capture (CU-08 FA1).",
             "content": {
               "application/json": {
                 "schema": {
@@ -13281,6 +14880,16 @@
                     "value": {
                       "code": "PAYMENT_ATTEMPTS_EXHAUSTED",
                       "message": "Pago declinado. Se agotaron los intentos y los asientos fueron liberados",
+                      "details": {
+                        "attemptsRemaining": 0
+                      }
+                    }
+                  },
+                  "captureDeclined": {
+                    "summary": "The provider rejected the capture; the authorization was cancelled and the seats were released",
+                    "value": {
+                      "code": "PAYMENT_ATTEMPTS_EXHAUSTED",
+                      "message": "Pago rechazado por la pasarela. No se hizo ningún cargo y los asientos fueron liberados",
                       "details": {
                         "attemptsRemaining": 0
                       }
@@ -13372,6 +14981,49 @@
                 "example": {
                   "code": "RESERVATION_NOT_FOUND",
                   "message": "La reserva no existe"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
                 }
               }
             }
@@ -13558,6 +15210,52 @@
                 "example": {
                   "code": "RESERVATION_EXPIRED",
                   "message": "Tiempo agotado"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
+                  }
                 }
               }
             }
@@ -14191,7 +15889,7 @@
         ],
         "operationId": "getEventSales",
         "summary": "Sales dashboard of my event (CU-13)",
-        "description": "**Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;\n403 `NOT_EVENT_OWNER` for another organizer's event).\n`purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`; `ticketsSold`, `capacity`\nand `byZone` come from InventoryService `GET /internal/zones?eventId=`.\n",
+        "description": "**Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;\n403 `NOT_EVENT_OWNER` for another organizer's event).\n`purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`.\n`byZone[].revenue` comes from PurchaseService: the unit price actually paid for each item\nof those purchases, so it does not change if the zone price is edited later and the sum of\n`byZone[].revenue` equals `grossRevenue`. `ticketsSold`, `capacity` and the other `byZone`\nfields (`name`, current `price`, `capacity`, `sold`, `reserved`) come from InventoryService\n`GET /internal/zones?eventId=`.\n",
         "responses": {
           "200": {
             "description": "Metrics for charts and revenue.",
@@ -15719,6 +17417,49 @@
               }
             }
           },
+          "408": {
+            "description": "The gateway did not receive the whole request in time: the headers within\n`GATEWAY_HEADERS_TIMEOUT_SECONDS` (15 s by default) or the full request, body included,\nwithin `GATEWAY_REQUEST_TIMEOUT_SECONDS` (60 s by default). The gateway answers this JSON\nwith `Connection: close`, stops reading after a short grace period and closes the\nconnection. Any request can get it; it is listed on every operation with a request body,\npublic or authenticated, where a slow upload is the usual cause (a 4.9 MB poster needs\nabout 85 KB/s).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "REQUEST_TIMEOUT",
+                  "message": "La petición tardó demasiado en llegar completa; intente de nuevo"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The ticket was already used, or it was cancelled (\"Acceso Denegado\").",
             "content": {
@@ -15771,6 +17512,52 @@
                       "code": "TICKET_CANCELLED",
                       "message": "Acceso Denegado. El boleto fue cancelado"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than 100 KB. The gateway rejects it from `Content-Length`, or\ncuts the stream when a chunked body goes over the limit; each service applies the same limit.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Stable machine-readable code. Clients branch on this, never on `message`.",
+                      "example": "VALIDATION_ERROR"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message in Spanish, ready to show in the UI.",
+                      "example": "Por favor llene todos los campos requeridos"
+                    },
+                    "details": {
+                      "type": "object",
+                      "description": "Optional extra data (invalid fields, unavailable seats, etc.).",
+                      "additionalProperties": true,
+                      "example": {
+                        "fields": [
+                          {
+                            "field": "title",
+                            "issue": "required"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "code": "PAYLOAD_TOO_LARGE",
+                  "message": "El cuerpo de la petición es demasiado grande",
+                  "details": {
+                    "limit": 102400
                   }
                 }
               }

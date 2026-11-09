@@ -9,10 +9,26 @@ info:
     Use cases: CU-08 (includes CU-09), CU-13. Internal stats serve CU-16.
 
     **CU-08 flow** (sequence diagram): check reservation with InventoryService
-    (`GET /internal/reservations/{id}`) -> charge the payment provider -> save purchase ->
-    `POST /internal/reservations/{id}/confirm-sale` -> `POST /internal/tickets/issue` in TicketService.
+    (`GET /internal/reservations/{id}`) -> authorize the payment (manual capture) ->
+    `POST /internal/reservations/{id}/confirm-sale` -> capture the payment -> save purchase ->
+    `POST /internal/tickets/issue` in TicketService. If confirm-sale fails, the authorization is
+    cancelled and the buyer is not charged. If the provider definitively rejects the capture, the
+    authorization is cancelled, the sale is undone through
+    `POST /internal/reservations/{id}/revoke-sale` (seats back to AVAILABLE), the purchase stays
+    DECLINED and the buyer gets 402 `PAYMENT_ATTEMPTS_EXHAUSTED`. If the cancellation answers
+    404 `resource_missing` (the PaymentIntent does not exist), there is nothing to cancel: the
+    seats are released and the attempt ends CANCELED. The 402 message says the seats were
+    released only when InventoryService already released them; if the cancellation or the release
+    is still pending, the message says so and the sweep retries it. A capture that fails for a
+    transient reason (timeout, 5xx, 429, invalid response) answers 503 and is retried; the seats
+    stay SOLD until it resolves.
     If ticket issuance fails, the purchase is still PAID and the issue call is queued for retry
     (CU-09 EX1); the response then says `ticketIssuance: PENDING`.
+
+    **Recovery cap.** Failed cancellations, refunds and seat releases are retried by the payment
+    sweep up to `PAYMENT_RECOVERY_MAX_ATTEMPTS` times (default 20). After that the attempt ends in
+    the internal state RECOVERY_FAILED, the sweep stops retrying it and an `ALERTA:` line is
+    logged for manual review. `GET /internal/reservations/{reservationId}/payment-attempts` shows it.
 
     **Card data.** The client tokenizes the card with the provider SDK (or sends a provider test
     payment method such as `pm_card_visa`). The API never receives or stores card numbers.
@@ -51,6 +67,13 @@ paths:
       description: |
         **Role:** BUYER (owner of the reservation). The amount is taken from the reservation, never
         from the client. Retrying after a decline is allowed until `PAYMENT_MAX_ATTEMPTS`.
+
+        **Idempotency.** The server guarantees at most one charge per reservation; an
+        `Idempotency-Key` header sent by the client is ignored. Simultaneous requests for the same
+        reservation are processed one at a time. After a 503 `PAYMENT_GATEWAY_UNAVAILABLE` (for
+        example a provider timeout), a retry first resolves the earlier attempt with the provider:
+        if that attempt was approved, the purchase is completed with it and the
+        `paymentMethodToken` of the retry is not charged.
       requestBody:
         required: true
         content:
@@ -89,7 +112,7 @@ paths:
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '402':
-          description: The provider declined the charge (CU-08 FA1).
+          description: The provider declined the charge or its capture (CU-08 FA1).
           content:
             application/json:
               schema:
@@ -110,6 +133,13 @@ paths:
                     message: Pago declinado. Se agotaron los intentos y los asientos fueron liberados
                     details:
                       attemptsRemaining: 0
+                captureDeclined:
+                  summary: The provider rejected the capture; the authorization was cancelled and the seats were released
+                  value:
+                    code: PAYMENT_ATTEMPTS_EXHAUSTED
+                    message: Pago rechazado por la pasarela. No se hizo ningún cargo y los asientos fueron liberados
+                    details:
+                      attemptsRemaining: 0
         '403':
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
@@ -121,6 +151,8 @@ paths:
               example:
                 code: RESERVATION_NOT_FOUND
                 message: La reserva no existe
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: The reservation is already paid, or it was cancelled.
           content:
@@ -149,6 +181,8 @@ paths:
               example:
                 code: RESERVATION_EXPIRED
                 message: Tiempo agotado
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '502':
           description: The payment provider returned an invalid or unexpected response. No sale was confirmed.
           content:
@@ -242,8 +276,12 @@ paths:
       description: |
         **Role:** ORGANIZER (owner, checked with CatalogService `GET /internal/events/{eventId}`;
         403 `NOT_EVENT_OWNER` for another organizer's event).
-        `purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`; `ticketsSold`, `capacity`
-        and `byZone` come from InventoryService `GET /internal/zones?eventId=`.
+        `purchases`, `grossRevenue` and `byDay` come from PAID purchases filtered by `event_id`.
+        `byZone[].revenue` comes from PurchaseService: the unit price actually paid for each item
+        of those purchases, so it does not change if the zone price is edited later and the sum of
+        `byZone[].revenue` equals `grossRevenue`. `ticketsSold`, `capacity` and the other `byZone`
+        fields (`name`, current `price`, `capacity`, `sold`, `reserved`) come from InventoryService
+        `GET /internal/zones?eventId=`.
       responses:
         '200':
           description: Metrics for charts and revenue.
@@ -316,6 +354,41 @@ paths:
                 purchases: 3120
                 grossRevenue: '9876500.00'
                 currency: MXN
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+
+  /internal/reservations/{reservationId}/payment-attempts:
+    get:
+      tags: [Internal]
+      operationId: internalPaymentAttempts
+      summary: Payment attempts of a reservation's purchase (internal, operations)
+      description: |
+        **Internal** (service-to-service and operations). Lists every payment attempt of the
+        purchase of the reservation with its internal status, including RECOVERY_FAILED when the
+        recovery cap was reached. A reservation without a purchase returns an empty list.
+      security:
+        - internalAuth: []
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/Id'
+      responses:
+        '200':
+          description: Attempts ordered by attempt number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAttemptList'
+              example:
+                items:
+                  - attempt: 1
+                    status: CANCELED
+                    declineCode: resource_missing
+                    lastError: null
+                    recoveryAttempts: 0
+                    updatedAt: '2026-10-26T15:45:10Z'
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
 
@@ -412,13 +485,61 @@ components:
         ticketIssuance:
           type: string
           enum: [ISSUED, PENDING]
-          description: PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).
+          description: |
+            PENDING when TicketService failed and the issue call was queued for retry (CU-09 EX1).
+            Internally the purchase moves to a FAILED issuance state once `TICKET_RETRY_MAX_ATTEMPTS`
+            retries are exhausted (logged for manual review). The API does not expose FAILED:
+            `ticketIssuance` only appears in this response, which always says ISSUED or PENDING,
+            and `GET /purchases/me` and `GET /purchases/{purchaseId}` do not include it.
         ticketIds:
           type: array
           description: Empty when `ticketIssuance` is PENDING.
           items:
             type: string
             format: uuid
+    PaymentAttemptList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentAttempt'
+    PaymentAttempt:
+      type: object
+      additionalProperties: false
+      required: [attempt, status, declineCode, lastError, recoveryAttempts, updatedAt]
+      properties:
+        attempt:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - PENDING
+            - AUTHORIZED
+            - CAPTURED
+            - CAPTURE_FAILED
+            - DECLINED
+            - FAILED
+            - CANCEL_PENDING
+            - CANCELED
+            - REFUND_PENDING
+            - REFUNDED
+            - RECOVERY_FAILED
+        declineCode:
+          type: string
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+        recoveryAttempts:
+          type: integer
+          minimum: 0
+          description: Failed cancellations, refunds or releases; capped by PAYMENT_RECOVERY_MAX_ATTEMPTS.
+        updatedAt:
+          type: string
+          format: date-time
     PurchasePage:
       allOf:
         - $ref: './common.yaml#/components/schemas/PageMeta'

@@ -58,6 +58,7 @@ export async function toReservation(row, conn) {
     userId: row.user_id,
     eventId: row.event_id,
     status,
+    purchaseId: row.purchase_id ?? null,
     createdAt: iso(row.created_at),
     expiresAt: iso(row.expires_at),
     secondsRemaining: remaining,
@@ -121,6 +122,28 @@ async function confirmLocked(conn, row, purchaseId) {
   );
   row.status = 'CONFIRMED';
   row.purchase_id = purchaseId;
+}
+
+async function revokeLocked(conn, row) {
+  await query(
+    "UPDATE seats SET status = 'AVAILABLE', reservation_id = NULL WHERE reservation_id = ? AND status = 'SOLD'",
+    [row.id],
+    conn,
+  );
+  for (const { zone_id: zoneId, quantity } of await quantitiesByZone(row.id, conn)) {
+    await query(
+      'UPDATE zones SET sold_count = sold_count - ? WHERE id = ?',
+      [Number(quantity), zoneId],
+      conn,
+    );
+  }
+  await query(
+    "UPDATE reservations SET status = 'CANCELLED', purchase_id = NULL WHERE id = ?",
+    [row.id],
+    conn,
+  );
+  row.status = 'CANCELLED';
+  row.purchase_id = null;
 }
 
 const isLockFailure = (err) => err?.errno === 1213 || err?.errno === 1205;
@@ -219,6 +242,20 @@ export const confirmAction = (purchaseId) => async (row, conn) => {
   );
   if (used) return invalidState(row.status);
   return confirmLocked(conn, row, purchaseId);
+};
+
+const notRevocable = (status) =>
+  new HttpError(409, 'INVALID_RESERVATION_STATE', 'La venta de la reserva no se puede revocar', {
+    status,
+  });
+
+export const revokeSaleAction = (purchaseId) => async (row, conn) => {
+  if (row.status === 'CONFIRMED') {
+    if (row.purchase_id !== purchaseId) return notRevocable(row.status);
+    return revokeLocked(conn, row);
+  }
+  if (row.status === 'ACTIVE') return notRevocable(row.status);
+  return null;
 };
 
 const itemNotValid = (index, field) =>

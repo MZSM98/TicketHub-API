@@ -175,6 +175,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/ZoneNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: The zone is GENERAL, or it already has reserved or sold seats.
           content:
@@ -190,6 +192,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -252,8 +256,12 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           $ref: '#/components/responses/EventNotEditable'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
 
@@ -288,6 +296,8 @@ paths:
           $ref: './common.yaml#/components/responses/NotEventOwner'
         '404':
           $ref: '#/components/responses/ZoneNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: |
             `ZONE_TYPE_CHANGE` when `type` differs from the current one (details carry the current
@@ -318,6 +328,8 @@ paths:
                   value:
                     code: ZONE_HAS_SALES
                     message: La zona ya tiene asientos reservados o vendidos
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '503':
           $ref: './common.yaml#/components/responses/ServiceUnavailable'
     delete:
@@ -354,7 +366,8 @@ paths:
       description: |
         **Role:** BUYER. All items must belong to `eventId`, which must be PUBLISHED and in the future.
         A buyer can have only one ACTIVE reservation at a time. Max `MAX_TICKETS_PER_RESERVATION`
-        tickets (default 10). Each item is either `{ seatId }` (NUMBERED zone) or
+        tickets (default 10). The hard limit is 10: InventoryService refuses to start when
+        `MAX_TICKETS_PER_RESERVATION` is not an integer between 1 and 10. Each item is either `{ seatId }` (NUMBERED zone) or
         `{ zoneId, quantity }` (GENERAL zone).
       requestBody:
         required: true
@@ -389,6 +402,7 @@ paths:
                 userId: 101
                 eventId: 12
                 status: ACTIVE
+                purchaseId: null
                 createdAt: '2026-10-26T15:40:00Z'
                 expiresAt: '2026-10-26T15:50:00Z'
                 secondsRemaining: 600
@@ -426,6 +440,8 @@ paths:
           $ref: './common.yaml#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/EventNotFound'
+        '408':
+          $ref: './common.yaml#/components/responses/RequestTimeout'
         '409':
           description: Lost the race for a seat, not enough capacity, or the buyer already has an active reservation.
           content:
@@ -459,6 +475,8 @@ paths:
                       reservationId: 4990
         '410':
           $ref: '#/components/responses/EventNotAvailable'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
         '500':
           description: Unexpected concurrency failure (CU-06 EX1), for example a deadlock after retries.
           content:
@@ -563,17 +581,19 @@ paths:
       operationId: internalGetReservation
       summary: Check a reservation before charging (internal, CU-08 verificarVigenciaReserva)
       description: |
-        **Internal** (service-to-service). PurchaseService reads status, owner, items and `total`.
-        It must reject the payment unless `status=ACTIVE` and `expiresAt` is in the future.
+        **Internal** (service-to-service). PurchaseService reads status, owner, items, `total` and
+        `purchaseId`. It must reject the payment unless `status=ACTIVE` and `expiresAt` is in the
+        future. `purchaseId` lets PurchaseService recognize a reservation CONFIRMED by its own
+        purchase (for example after a failed capture) and finish that purchase instead of undoing it.
       security:
         - internalAuth: []
       responses:
         '200':
-          description: Reservation (status already reflects expiration).
+          description: Reservation (status already reflects expiration) plus `purchaseId`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Reservation'
+                $ref: '#/components/schemas/InternalReservation'
         '401':
           $ref: './common.yaml#/components/responses/Unauthorized'
         '404':
@@ -629,6 +649,8 @@ paths:
                   status: CANCELLED
         '410':
           $ref: '#/components/responses/ReservationExpired'
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/reservations/{reservationId}/release:
     parameters:
@@ -662,6 +684,57 @@ paths:
               example:
                 code: RESERVATION_ALREADY_CONFIRMED
                 message: La reserva ya fue pagada y no se puede cancelar
+
+  /internal/reservations/{reservationId}/revoke-sale:
+    parameters:
+      - $ref: '#/components/parameters/ReservationId'
+    post:
+      tags: [Internal]
+      operationId: internalRevokeSale
+      summary: Undo a confirmed sale whose capture was definitively declined (internal, CU-08)
+      description: |
+        **Internal** (service-to-service). Called by PurchaseService when the provider definitively
+        rejects the capture after `confirm-sale`. In one transaction: seats SOLD -> AVAILABLE,
+        `soldCount` goes down, reservation CONFIRMED -> CANCELLED and `purchaseId` is cleared.
+        Idempotent: a CANCELLED or EXPIRED reservation returns 200 without changes.
+      security:
+        - internalAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purchaseId]
+              properties:
+                purchaseId:
+                  $ref: './common.yaml#/components/schemas/Id'
+            example:
+              purchaseId: 8001
+      responses:
+        '200':
+          description: Sale revoked (or the reservation was already CANCELLED/EXPIRED).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: './common.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ReservationNotFound'
+        '409':
+          description: The reservation is ACTIVE, or CONFIRMED by a different purchase.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                code: INVALID_RESERVATION_STATE
+                message: La venta de la reserva no se puede revocar
+                details:
+                  status: CONFIRMED
+        '413':
+          $ref: './common.yaml#/components/responses/PayloadTooLarge'
 
   /internal/zones:
     get:
@@ -933,10 +1006,16 @@ components:
         seatNumber:
           type: integer
           minimum: 1
+          description: |
+            Position in the row: consecutive from 1 to the row's `seatCount`, with no gaps. Aisles are
+            not modelled, so consecutive numbers in the same row are adjacent seats.
         status:
           $ref: '#/components/schemas/SeatStatus'
     SeatMap:
       type: object
+      description: |
+        Rows come in the order the organizer sent them when the seats were generated (not sorted by
+        `rowLabel`). Within a row, seats are sorted by `seatNumber` ascending.
       required: [zoneId, eventId, name, price, currency, rows]
       properties:
         zoneId:
@@ -951,6 +1030,7 @@ components:
           $ref: './common.yaml#/components/schemas/Currency'
         rows:
           type: array
+          description: In the order the organizer defined them, not sorted by `rowLabel`.
           items:
             type: object
             required: [rowLabel, seats]
@@ -959,6 +1039,7 @@ components:
                 type: string
               seats:
                 type: array
+                description: Sorted by `seatNumber` ascending (1..seatCount).
                 items:
                   $ref: '#/components/schemas/Seat'
     SeatLayoutInput:
@@ -1007,6 +1088,8 @@ components:
         items:
           type: array
           minItems: 1
+          maxItems: 10
+          description: At most `MAX_TICKETS_PER_RESERVATION` (integer 1-10, default 10) items; never more than 10.
           items:
             oneOf:
               - $ref: '#/components/schemas/SeatItemInput'
@@ -1035,9 +1118,13 @@ components:
           minimum: 1
         unitPrice:
           $ref: './common.yaml#/components/schemas/Money'
+    InternalReservation:
+      description: Reservation as seen by PurchaseService. Same shape as `Reservation`.
+      allOf:
+        - $ref: '#/components/schemas/Reservation'
     Reservation:
       type: object
-      required: [id, userId, eventId, status, createdAt, expiresAt, secondsRemaining, total, currency, items]
+      required: [id, userId, eventId, status, purchaseId, createdAt, expiresAt, secondsRemaining, total, currency, items]
       properties:
         id:
           $ref: './common.yaml#/components/schemas/Id'
@@ -1047,6 +1134,14 @@ components:
           $ref: './common.yaml#/components/schemas/Id'
         status:
           $ref: '#/components/schemas/ReservationStatus'
+        purchaseId:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+          description: |
+            Purchase that paid the reservation. Set while `status=CONFIRMED`; null for ACTIVE,
+            EXPIRED and CANCELLED (including a sale undone after a rejected capture).
         createdAt:
           type: string
           format: date-time
