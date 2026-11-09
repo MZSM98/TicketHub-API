@@ -11,6 +11,7 @@ import {
   providerName,
   refund,
 } from './payments/index.js';
+import { buildAttemptKey, keyNamespace } from './attempt-key.js';
 import { revokeSale } from './services.js';
 
 export class ClaimLostError extends Error {
@@ -38,12 +39,12 @@ async function updateAttempt(claim, attemptId, assignments, params, conn) {
 }
 
 export const attemptKey = (reservationId, attempt) =>
-  `tickethub-${config.paymentNamespace}-reservation-${reservationId}-attempt-${attempt}`;
+  buildAttemptKey(config.paymentNamespace, reservationId, attempt);
 
-const LEGACY_KEY = /^tickethub-reservation-\d+-attempt-\d+$/;
-
-const deploymentOf = (attempt) =>
-  LEGACY_KEY.test(attempt.idempotency_key) ? {} : { deployment: config.paymentNamespace };
+const deploymentOf = (attempt) => {
+  const namespace = keyNamespace(attempt);
+  return namespace ? { deployment: namespace } : {};
+};
 
 export async function claimPurchase(purchaseId) {
   const token = randomUUID();
@@ -342,11 +343,18 @@ async function setStatus(claim, attempt, status, error = null) {
 const RECOVERY_WINDOW_SECONDS = 300;
 
 async function recoverReference(claim, attempt) {
+  const deployment = keyNamespace(attempt);
+  if (!deployment) {
+    console.error(
+      `ALERTA: el intento ${attempt.idempotency_key} (compra ${attempt.purchase_id}, reserva ${attempt.reservation_id}) tiene una llave sin PAYMENT_NAMESPACE; no se busca ni se cancela su autorización en Stripe porque podría ser de otro despliegue; requiere revisión manual`,
+    );
+    return null;
+  }
   const found = await findIntent({
     metadata: {
       reservation_id: attempt.reservation_id,
       attempt: attempt.attempt,
-      ...deploymentOf(attempt),
+      deployment,
     },
     createdAfter: Math.floor(attempt.created_at.getTime() / 1000) - RECOVERY_WINDOW_SECONDS,
   });
