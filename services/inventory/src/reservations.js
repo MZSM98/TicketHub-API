@@ -2,6 +2,7 @@ import { query, transaction } from '@tickethub/common/db';
 import { HttpError } from '@tickethub/common/http';
 import { config } from './config.js';
 import { CURRENCY } from './zones.js';
+import { insertUnlessActive } from './active-conflict.js';
 
 export const reservationNotFound = () =>
   new HttpError(404, 'RESERVATION_NOT_FOUND', 'La reserva no existe');
@@ -267,13 +268,30 @@ const itemNotValid = (index, field) =>
     },
   );
 
+const ACTIVE_CONFLICT_ROUNDS = 3;
+
+async function insertOrReportActive(userId, insert) {
+  const result = await insertUnlessActive(
+    insert,
+    () => activeReservationIdOf(userId),
+    ACTIVE_CONFLICT_ROUNDS,
+  );
+  if (result.activeId !== undefined) throw activeReservationExists(result.activeId);
+  if (result.exhausted) {
+    console.error(
+      `La reserva activa del usuario ${userId} desapareció ${ACTIVE_CONFLICT_ROUNDS} veces seguidas tras el conflicto de unicidad`,
+    );
+    throw reservationFailed();
+  }
+  return result.id;
+}
+
 export async function createReservation(userId, eventId, items) {
   const seatItems = items.filter((item) => item.seatId !== undefined);
   const generalItems = items.filter((item) => item.zoneId !== undefined);
   const seatIds = seatItems.map((item) => item.seatId);
-  let reservationId;
-  try {
-    reservationId = await withRetry(() =>
+  const reservationId = await insertOrReportActive(userId, () =>
+    withRetry(() =>
       transaction(async (conn) => {
         const placesByZone = new Map();
         const priceByZone = new Map();
@@ -374,13 +392,8 @@ export async function createReservation(userId, eventId, items) {
         }
         return id;
       }),
-    );
-  } catch (err) {
-    if (err?.errno === 1062) {
-      throw activeReservationExists(await activeReservationIdOf(userId));
-    }
-    throw err;
-  }
+    ),
+  );
   const [row] = await query(`SELECT ${RESERVATION_COLUMNS} FROM reservations WHERE id = ?`, [
     reservationId,
   ]);

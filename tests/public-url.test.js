@@ -209,4 +209,46 @@ describe('URLs absolutas según el host de cada petición', () => {
       assert.throws(() => parseAllowedHosts(`localhost,${bad}`), /rango inválido/, bad);
     }
   });
+
+  test('unidad: ceros a la izquierda, ip:puerto y rangos IPv4 mapeados en IPv6 impiden arrancar', () => {
+    const invalidRanges = [
+      '10.0.0.0/08',
+      '010.0.0.0/8',
+      '10.0.0.0/008',
+      '::/0',
+      '::/80',
+      '::ffff:0:0/96',
+      '::ffff:192.168.0.0/112',
+      '::ffff:c0a8:0/120',
+    ];
+    for (const bad of invalidRanges) {
+      assert.throws(() => parseAllowedHosts(`localhost,${bad}`), /rango inválido/, bad);
+    }
+    for (const bad of ['192.168.1.5:8080', 'localhost:8080', '[::1]:8080', '[::ffff:10.0.0.1]']) {
+      assert.throws(() => parseAllowedHosts(`localhost,${bad}`), /entrada inválida/, bad);
+    }
+    assert.equal(parseAllowedHosts('2001:db8::/32, [::1], 0.0.0.0/0, localhost').empty, false);
+  });
+
+  test('unidad: un Host IPv4 mapeado en IPv6 no equivale a la IPv4 permitida', () => {
+    const secret = 's'.repeat(32);
+    const opts = {
+      fallback: 'http://fb/api/v1',
+      gatewaySecret: secret,
+      allowedHosts: parseAllowedHosts('192.168.0.0/16'),
+    };
+    const url = (host) =>
+      publicBaseUrl(
+        { 'x-forwarded-host': host, 'x-forwarded-proto': 'http', 'x-tickethub-gateway': secret },
+        opts,
+      );
+    assert.equal(url('192.168.1.1:8080'), 'http://192.168.1.1:8080/api/v1');
+    for (const host of [
+      '[::ffff:192.168.1.1]:8080',
+      '[::ffff:c0a8:101]',
+      '[0:0:0:0:0:ffff:c0a8:101]',
+    ]) {
+      assert.equal(url(host), 'http://fb/api/v1', host);
+    }
+  });
 });

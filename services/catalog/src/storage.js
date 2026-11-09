@@ -11,6 +11,10 @@ const client = new Client({
 });
 const { bucket } = config.minio;
 
+export async function pingStorage() {
+  if (!(await client.bucketExists(bucket))) throw new Error('bucket');
+}
+
 export async function putObject(key, buffer, contentType) {
   await client.putObject(bucket, key, buffer, buffer.length, { 'Content-Type': contentType });
 }

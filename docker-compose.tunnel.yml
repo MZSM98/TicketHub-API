@@ -1,0 +1,23 @@
+services:
+  gateway:
+    networks: [tickethub, tunnel]
+    environment:
+      TRUST_PROXY: ${TUNNEL_PROXY_IP:-172.30.250.10}
+      TRUST_PROXY_HOST: 'false'
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.10.0
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', '--url', 'http://gateway:8080']
+    depends_on: [gateway]
+    networks:
+      tunnel:
+        ipv4_address: ${TUNNEL_PROXY_IP:-172.30.250.10}
+
+networks:
+  tunnel:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${TUNNEL_SUBNET:-172.30.250.0/24}

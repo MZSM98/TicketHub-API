@@ -86,10 +86,17 @@ services:
     extends: { file: docker-compose.yml, service: gateway }
     ports: !reset []
     environment:
-      TRUST_PROXY: 0.0.0.0/0,::/0
+      TRUST_PROXY: 0.0.0.0/0
+
+  gateway-degraded:
+    extends: { file: docker-compose.yml, service: gateway }
+    ports: !reset []
+    environment:
+      TICKET_SERVICE_URL: http://ticket-down.invalid:3005
 
   tests:
     environment:
+      GATEWAY_DEGRADED_URL: http://gateway-degraded:8080/api/v1
       GATEWAY_TRUSTED_URL: http://gateway-trusted:8080/api/v1
       PAYMENT_NAMESPACE: tickethub-pruebas
       INVENTORY_URL: http://inventory-service:3003/api/v1
@@ -110,3 +117,4 @@ services:
       purchase-shortclaim: { condition: service_healthy }
       gateway-slow: { condition: service_started }
       gateway-trusted: { condition: service_healthy }
+      gateway-degraded: { condition: service_healthy }

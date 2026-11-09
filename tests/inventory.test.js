@@ -587,6 +587,32 @@ describe('InventoryService (inventory.yaml)', () => {
       assert.equal(pista.reservedCount, 1);
     });
 
+    test('carrera: cancelar la reserva activa mientras llegan otras -> cada 409 trae un reservationId', async () => {
+      const token = s.buyers[1];
+      const body = { eventId: s.event.id, items: [{ zoneId: s.pista.id, quantity: 1 }] };
+      const counts = {};
+      for (let round = 0; round < 15; round++) {
+        const first = await expectContract('POST', '/reservations', 201, { token, body });
+        const [cancel, ...results] = await Promise.all([
+          call('POST', `/reservations/${first.id}/cancel`, { token }),
+          ...Array.from({ length: 5 }, () =>
+            call('POST', '/reservations', { token, body }).then((r) => ({ ...r, token })),
+          ),
+        ]);
+        assert.equal(cancel.res.status, 200);
+        for (const { res, body: answer } of results) {
+          assertContract(res, answer, 'POST', '/api/v1/reservations', res.status);
+          if (answer.code === 'ACTIVE_RESERVATION_EXISTS') {
+            assert.ok(Number.isInteger(answer.details.reservationId), JSON.stringify(answer));
+          }
+        }
+        for (const [key, n] of Object.entries(tally(results))) counts[key] = (counts[key] ?? 0) + n;
+        await cancelAll(results);
+      }
+      console.log(`[carrera cancelar/crear] ${JSON.stringify(counts)}`);
+      assert.deepEqual(Object.keys(counts).sort(), ['201 ACTIVE', '409 ACTIVE_RESERVATION_EXISTS']);
+    });
+
     test('todo o nada: si un asiento falla no se reserva ninguno', async () => {
       const [a, b] = s.buyers;
       const first = await expectContract('POST', '/reservations', 201, {
