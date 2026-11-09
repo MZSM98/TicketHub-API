@@ -140,7 +140,7 @@ export async function sendAuthorization(claim, attempt, userId) {
   } catch (err) {
     if (err instanceof PaymentIdempotencyError) {
       console.error(
-        `Intento ${attempt.idempotency_key} no se reintentará; se busca y cancela su autorización: ${err.message}`,
+        `Intento ${attempt.idempotency_key} no se reintentará; si su llave trae PAYMENT_NAMESPACE se busca y cancela su autorización, y si no queda para revisión manual: ${err.message}`,
       );
       await setStatus(claim, attempt, 'CANCEL_PENDING', err.message.slice(0, 255));
       await undoAttempt(claim, {
