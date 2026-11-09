@@ -12,6 +12,9 @@ fi
 umask 077
 while IFS= read -r line; do
   case "$line" in
+    PAYMENT_NAMESPACE=)
+      echo "PAYMENT_NAMESPACE=$(openssl rand -hex 8)"
+      ;;
     *=change-me*|*=sk_test_replace_me)
       key="${line%%=*}"
       if [ "$key" = "STRIPE_SECRET_KEY" ]; then
