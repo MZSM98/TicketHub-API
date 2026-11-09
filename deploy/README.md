@@ -53,4 +53,6 @@ vagrant halt               # apaga las VMs
 vagrant destroy -f         # las borra con sus volúmenes
 ```
 
+Dentro de vm1, si MinIO falla al arrancar, `minio-init` no termina y catalog y el gateway se quedan en `Created`. Arregla MinIO (`dc logs minio`) y repite `dc up -d`.
+
 La RAM se ajusta con `VM1_MEMORY` y `VM2_MEMORY` (MB) antes de `vagrant up`.

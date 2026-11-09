@@ -10,6 +10,10 @@ export const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
+export async function pingDatabase() {
+  await pool.query('SELECT 1');
+}
+
 export async function query(sql, params = [], conn = pool) {
   const [rows] = await conn.execute(sql, params);
   return rows;

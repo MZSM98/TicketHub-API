@@ -37,19 +37,36 @@ paths:
       security: []
       responses:
         '200':
-          description: The gateway is up. Each service reports UP or DOWN.
+          description: |
+            The gateway is up, so the response is always 200, even when a service is down.
+            `status` is UP when every service is UP and DEGRADED when at least one service is DOWN.
+            Each service reports UP or DOWN in `services`. A service is DOWN when its process does not answer,
+            or when its database (MySQL) or its storage (MinIO) fails.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
-              example:
-                status: UP
-                services:
-                  identity: UP
-                  catalog: UP
-                  inventory: UP
-                  purchase: DOWN
-                  ticket: UP
+              examples:
+                allUp:
+                  summary: Every service is UP
+                  value:
+                    status: UP
+                    services:
+                      identity: UP
+                      catalog: UP
+                      inventory: UP
+                      purchase: UP
+                      ticket: UP
+                degraded:
+                  summary: PurchaseService is DOWN
+                  value:
+                    status: DEGRADED
+                    services:
+                      identity: UP
+                      catalog: UP
+                      inventory: UP
+                      purchase: DOWN
+                      ticket: UP
 components:
   schemas:
     ServiceHealth:
@@ -61,7 +78,8 @@ components:
       properties:
         status:
           type: string
-          enum: [UP]
+          enum: [UP, DEGRADED]
+          description: UP when every service is UP; DEGRADED when at least one service is DOWN.
         services:
           type: object
           required: [identity, catalog, inventory, purchase, ticket]

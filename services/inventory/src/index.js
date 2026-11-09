@@ -1,4 +1,6 @@
 import express from 'express';
+import { pingDatabase } from '@tickethub/common/db';
+import { healthHandler } from '@tickethub/common/health';
 import { errorHandler, notFound } from '@tickethub/common/http';
 import { config } from './config.js';
 import { expireDue } from './reservations.js';
@@ -10,9 +12,7 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'UP', service: 'inventory' });
-});
+app.get('/health', healthHandler('inventory', [pingDatabase]));
 
 const api = express.Router();
 api.use(zonesRouter, reservationsRouter, internalRouter);

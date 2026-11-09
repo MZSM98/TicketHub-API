@@ -11,6 +11,8 @@ trap 'exit 130' INT TERM
 echo "Proyecto de Compose de pruebas: $project"
 compose up -d --build --wait &&
   compose exec -T identity-service npm run create-admin --silent &&
-  compose --profile test run --rm --use-aliases tests
+  compose --profile test run --rm --use-aliases tests &&
+  TEST_COMPOSE_PROJECT="$project" node --test --test-reporter=spec tests-host/health-deps.test.js &&
+  TEST_VM1_STARTUP=1 node --test --test-reporter=spec tests-host/vm1-startup.test.js
 status=$?
 exit "$status"

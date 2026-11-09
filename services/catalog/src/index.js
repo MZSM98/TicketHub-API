@@ -1,4 +1,7 @@
 import express from 'express';
+import { pingDatabase } from '@tickethub/common/db';
+import { healthHandler } from '@tickethub/common/health';
+import { pingStorage } from './storage.js';
 import { config } from './config.js';
 import { errorHandler, notFound } from '@tickethub/common/http';
 import { router as adminRouter } from './routes/admin.js';
@@ -11,9 +14,7 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'UP', service: 'catalog' });
-});
+app.get('/health', healthHandler('catalog', [pingDatabase, pingStorage]));
 
 const api = express.Router();
 api.use(eventsRouter, staffRouter, venuesRouter, adminRouter, internalRouter);
